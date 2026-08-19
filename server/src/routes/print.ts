@@ -2,6 +2,7 @@ import type { FastifyInstance } from "fastify";
 import { z } from "zod";
 import { printLabelPng } from "../print.js";
 import { logEvent } from "../log.js";
+import { getAllSettings } from "../settings.js";
 
 const printBody = z.object({
   templateId: z.string(),
@@ -16,9 +17,9 @@ export async function printRoutes(app: FastifyInstance) {
     if (!parsed.success) return reply.code(400).send({ error: parsed.error.flatten() });
     const { templateId, rentmanSerialNumberId, imageDataUrl, label } = parsed.data;
 
-    const settings = await req.pb.collection("settings").getFirstListItem("").catch(() => null);
+    const settings = await getAllSettings(req.pb);
     const png = Buffer.from(imageDataUrl.slice("data:image/png;base64,".length), "base64");
-    const result = await printLabelPng(png, label, settings?.printerHost || undefined);
+    const result = await printLabelPng(png, label, settings.printerHost || undefined);
 
     if (result.ok) {
       // "who" is the logged-in account, not client input — see auth.ts.

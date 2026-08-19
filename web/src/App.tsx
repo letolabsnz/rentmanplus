@@ -1,4 +1,5 @@
 import { useEffect } from "react";
+import { useQuery } from "@tanstack/react-query";
 import { NavLink, Navigate, Route, Routes, useLocation } from "react-router-dom";
 import EquipmentList from "./pages/EquipmentList";
 import EquipmentDetail from "./pages/EquipmentDetail";
@@ -27,13 +28,30 @@ function usePageViewLogging() {
   }, [location.pathname]);
 }
 
+// Header always shows "Rentman+"; the business name (if set at Settings >
+// General) appears alongside it. The browser tab prefixes "Rentman+" too,
+// but with the short name instead — the full name rarely fits.
+function useBusinessName() {
+  const { data: settings } = useQuery({ queryKey: ["settings"], queryFn: api.getSettings });
+  const shortOrFull = settings?.businessShortName || settings?.businessName;
+  const tabTitle = shortOrFull ? `Rentman+ | ${shortOrFull}` : "Rentman+";
+  useEffect(() => {
+    document.title = tabTitle;
+  }, [tabTitle]);
+  return settings?.businessName || null;
+}
+
 function AppShell() {
   const record = useAuthRecord();
+  const businessName = useBusinessName();
   usePageViewLogging();
   return (
     <div className="min-h-screen flex flex-col">
       <header className="border-b border-neutral-800 px-4 py-3 flex items-center gap-6">
-        <span className="font-semibold tracking-tight">Rentman+</span>
+        <div className="flex items-center gap-2.5">
+          <img src="/favicon.svg" alt="" className="w-7 h-7 rounded-md shrink-0" />
+          <span className="font-semibold tracking-tight">{businessName || "Rentman+"}</span>
+        </div>
         <nav className="flex gap-1 flex-1">
           <NavLink to="/equipment" className={navClass}>
             Assets

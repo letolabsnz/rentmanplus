@@ -89,7 +89,7 @@ export const api = {
   refresh: () => request<{ ok: boolean }>("/api/refresh", { method: "POST" }),
 
   getSettings: () => request<Settings>("/api/settings"),
-  updateSettings: (settings: { printerHost: string }) =>
+  updateSettings: (settings: Partial<{ printerHost: string; businessName: string; businessShortName: string }>) =>
     request<Settings>("/api/settings", { method: "PUT", body: JSON.stringify(settings) }),
 
   getStats: () => request<Stats>("/api/stats"),
@@ -99,8 +99,9 @@ export const api = {
 };
 
 export interface Settings {
-  id: string;
   printerHost: string;
+  businessName: string;
+  businessShortName: string;
 }
 
 export interface Stats {
