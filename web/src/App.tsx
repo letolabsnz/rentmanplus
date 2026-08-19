@@ -7,6 +7,7 @@ import AssetDetail from "./pages/AssetDetail";
 import ProjectsList from "./pages/ProjectsList";
 import ProjectDetail from "./pages/ProjectDetail";
 import SettingsPage from "./pages/SettingsPage";
+import CustomLabelPage from "./pages/CustomLabelPage";
 import LogsPage from "./pages/LogsPage";
 import LabelEditor from "./pages/LabelEditor";
 import LoginPage from "./pages/LoginPage";
@@ -56,6 +57,9 @@ function AppShell() {
           <NavLink to="/equipment" className={navClass}>
             Assets
           </NavLink>
+          <NavLink to="/custom-label" className={navClass}>
+            Custom label
+          </NavLink>
           {record?.isAdmin === true && (
             <NavLink to="/logs" className={navClass}>
               Logs
@@ -83,6 +87,7 @@ function AppShell() {
           <Route path="/assets/:id" element={<AssetDetail />} />
           <Route path="/projects" element={<ProjectsList />} />
           <Route path="/projects/:id" element={<ProjectDetail />} />
+          <Route path="/custom-label" element={<CustomLabelPage />} />
           <Route
             path="/logs"
             element={

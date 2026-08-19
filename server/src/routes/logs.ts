@@ -34,12 +34,19 @@ export async function logsRoutes(app: FastifyInstance) {
     const entries: LogEntry[] = logs.items.map((entry) => {
       const details = { ...(entry.details as Record<string, unknown>) };
       let summary = entry.type;
-      if (entry.type === "print") {
+      if (entry.type === "print" && typeof details.customText === "string") {
+        summary = `Printed custom label "${details.customText}"`;
+      } else if (entry.type === "print") {
         const templateId = typeof details.template === "string" ? details.template : "";
         const serialId = typeof details.rentmanSerialNumberId === "string" ? details.rentmanSerialNumberId : "";
         details.templateName = templateNameById.get(templateId) ?? "deleted template";
-        details.serialLabel = labelFor(serialId);
-        summary = `Printed "${details.templateName}" label · ${details.serialLabel}`;
+        summary = `Printed "${details.templateName}" label`;
+        if (serialId) {
+          details.serialLabel = labelFor(serialId);
+          summary += ` · ${details.serialLabel}`;
+        } else {
+          summary += " (manual field values)";
+        }
       } else if (entry.type === "login") {
         summary = "Logged in";
       } else if (entry.type === "page_view") {

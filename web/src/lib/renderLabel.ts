@@ -49,7 +49,7 @@ export async function renderLabelToCanvas(
 // Greedy word wrap — breaks a single very-long word (no spaces) by
 // character instead of overflowing, since asset codes/serials sometimes
 // have no natural break point.
-function wrapText(ctx: CanvasRenderingContext2D, text: string, maxWidth: number): string[] {
+export function wrapText(ctx: CanvasRenderingContext2D, text: string, maxWidth: number): string[] {
   const lines: string[] = [];
   for (const paragraph of text.split("\n")) {
     let current = "";
