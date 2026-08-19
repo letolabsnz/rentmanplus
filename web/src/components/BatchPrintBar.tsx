@@ -3,6 +3,7 @@ import { useQuery } from "@tanstack/react-query";
 import { Link } from "react-router-dom";
 import { api } from "../lib/api";
 import { printAsset, type PrintableAsset } from "../lib/print";
+import { useToast } from "./ToastProvider";
 
 export default function BatchPrintBar({
   assets,
@@ -14,6 +15,7 @@ export default function BatchPrintBar({
   const [open, setOpen] = useState(false);
   const [copies, setCopies] = useState(1);
   const [progress, setProgress] = useState<{ done: number; total: number; failed: string[] } | null>(null);
+  const { showToast } = useToast();
 
   const { data: templates } = useQuery({ queryKey: ["labels"], queryFn: api.listLabels, enabled: open });
 
@@ -43,10 +45,13 @@ export default function BatchPrintBar({
     }
 
     if (failed.length === 0) {
+      showToast("success", `Printed ${total} label${total === 1 ? "" : "s"}`);
       setTimeout(() => {
         setProgress(null);
         onDone();
       }, 1500);
+    } else {
+      showToast("error", `${failed.length}/${total} labels failed to print: ${failed.join(", ")}`);
     }
   }
 

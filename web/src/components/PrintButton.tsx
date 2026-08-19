@@ -1,14 +1,14 @@
-import { useRef, useState } from "react";
+import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Link } from "react-router-dom";
 import { api } from "../lib/api";
 import { printAsset, type PrintableAsset } from "../lib/print";
+import { useToast } from "./ToastProvider";
 
 export default function PrintButton({ asset }: { asset: PrintableAsset }) {
   const [open, setOpen] = useState(false);
-  const [status, setStatus] = useState<string | null>(null);
   const [printing, setPrinting] = useState(false);
-  const closeTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const { showToast } = useToast();
 
   const { data: templates } = useQuery({ queryKey: ["labels"], queryFn: api.listLabels, enabled: open });
 
@@ -16,17 +16,18 @@ export default function PrintButton({ asset }: { asset: PrintableAsset }) {
     const template = templates?.find((t) => t.id === templateId);
     if (!template) return;
     setPrinting(true);
-    setStatus(null);
     try {
       const result = await printAsset(asset, template);
-      setStatus(result.ok ? "Printed" : `Failed: ${result.message}`);
+      if (result.ok) {
+        showToast("success", "Printed");
+      } else {
+        showToast("error", `Print failed: ${result.message}`);
+      }
     } catch (err) {
-      setStatus(`Failed: ${(err as Error).message}`);
+      showToast("error", `Print failed: ${(err as Error).message}`);
     } finally {
       setPrinting(false);
       setOpen(false);
-      if (closeTimer.current) clearTimeout(closeTimer.current);
-      closeTimer.current = setTimeout(() => setStatus(null), 5000);
     }
   }
 
@@ -39,8 +40,6 @@ export default function PrintButton({ asset }: { asset: PrintableAsset }) {
       >
         {printing ? "Printing…" : "Print label"}
       </button>
-
-      {status && <p className="absolute top-full right-0 mt-1 text-xs text-neutral-400 whitespace-nowrap">{status}</p>}
 
       {open && (
         <div className="absolute top-full right-0 mt-2 w-56 border border-neutral-800 bg-neutral-950 rounded-lg shadow-lg z-10 overflow-hidden">

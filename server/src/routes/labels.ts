@@ -1,5 +1,6 @@
 import type { FastifyInstance } from "fastify";
 import { z } from "zod";
+import { logEvent } from "../log.js";
 
 const elementSchema = z.object({
   id: z.string(),
@@ -46,19 +47,33 @@ export async function labelRoutes(app: FastifyInstance) {
   app.post("/api/labels", async (req, reply) => {
     const parsed = templateBody.safeParse(req.body);
     if (!parsed.success) return reply.code(400).send({ error: parsed.error.flatten() });
-    return req.pb.collection("label_templates").create(parsed.data);
+    const created = await req.pb.collection("label_templates").create(parsed.data);
+    const who = req.user.name || req.user.email;
+    await logEvent(req.pb, "label_created", who, { id: created.id, name: created.name });
+    return created;
   });
 
   app.put("/api/labels/:id", async (req, reply) => {
     const { id } = req.params as { id: string };
     const parsed = templateBody.safeParse(req.body);
     if (!parsed.success) return reply.code(400).send({ error: parsed.error.flatten() });
-    return req.pb.collection("label_templates").update(id, parsed.data);
+    const updated = await req.pb.collection("label_templates").update(id, parsed.data);
+    const who = req.user.name || req.user.email;
+    await logEvent(req.pb, "label_updated", who, { id: updated.id, name: updated.name });
+    return updated;
   });
 
   app.delete("/api/labels/:id", async (req) => {
     const { id } = req.params as { id: string };
+    // Fetched before deleting purely so the log entry can name the
+    // template — it's gone from label_templates after this either way.
+    const existing = await req.pb
+      .collection("label_templates")
+      .getOne(id)
+      .catch(() => null);
     await req.pb.collection("label_templates").delete(id);
+    const who = req.user.name || req.user.email;
+    await logEvent(req.pb, "label_deleted", who, { id, name: existing?.name ?? id });
     return { ok: true };
   });
 }

@@ -3,6 +3,8 @@ import { Link } from "react-router-dom";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { api } from "../lib/api";
 import type { LabelTemplateData } from "../lib/labelSpec";
+import { useConfirm } from "../components/ConfirmProvider";
+import { useToast } from "../components/ToastProvider";
 
 // A template as it comes back from GET /api/labels, minus the DB-assigned
 // fields that shouldn't be carried over when re-importing (id would collide,
@@ -20,11 +22,24 @@ export default function LabelsList() {
   const { data: templates, isLoading } = useQuery({ queryKey: ["labels"], queryFn: api.listLabels });
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [importing, setImporting] = useState(false);
+  const confirm = useConfirm();
+  const { showToast } = useToast();
 
-  async function remove(id: string) {
-    if (!confirm("Delete this label template?")) return;
-    await api.deleteLabel(id);
-    queryClient.invalidateQueries({ queryKey: ["labels"] });
+  async function remove(id: string, name: string) {
+    const ok = await confirm({
+      title: "Delete label template",
+      message: `Delete "${name}"? This can't be undone.`,
+      confirmLabel: "Delete",
+      danger: true,
+    });
+    if (!ok) return;
+    try {
+      await api.deleteLabel(id);
+      await queryClient.invalidateQueries({ queryKey: ["labels"] });
+      showToast("success", `Deleted "${name}"`);
+    } catch (err) {
+      showToast("error", `Couldn't delete "${name}": ${(err as Error).message}`);
+    }
   }
 
   function exportAll() {
@@ -51,7 +66,7 @@ export default function LabelsList() {
       const candidates = Array.isArray(parsed) ? parsed : [parsed];
       const valid = candidates.filter(isExportedTemplate);
       if (valid.length === 0) {
-        alert("No valid label templates found in that file.");
+        showToast("error", "No valid label templates found in that file.");
         return;
       }
       let failed = 0;
@@ -64,13 +79,14 @@ export default function LabelsList() {
       }
       await queryClient.invalidateQueries({ queryKey: ["labels"] });
       const skipped = candidates.length - valid.length;
-      alert(
-        `Imported ${valid.length - failed} template${valid.length - failed === 1 ? "" : "s"}.` +
-          (failed ? ` ${failed} failed.` : "") +
-          (skipped ? ` ${skipped} skipped (not a valid template).` : ""),
-      );
+      const imported = valid.length - failed;
+      const summary =
+        `Imported ${imported} template${imported === 1 ? "" : "s"}.` +
+        (failed ? ` ${failed} failed.` : "") +
+        (skipped ? ` ${skipped} skipped (not a valid template).` : "");
+      showToast(failed || skipped ? "error" : "success", summary);
     } catch {
-      alert("Couldn't read that file — make sure it's a label templates JSON export.");
+      showToast("error", "Couldn't read that file — make sure it's a label templates JSON export.");
     } finally {
       setImporting(false);
     }
@@ -125,7 +141,7 @@ export default function LabelsList() {
                 {t.widthMm}×{t.heightMm}mm · {t.elements.length} element{t.elements.length === 1 ? "" : "s"}
               </span>
             </Link>
-            <button onClick={() => remove(t.id)} className="text-neutral-600 hover:text-red-400 text-xs">
+            <button onClick={() => remove(t.id, t.name)} className="text-neutral-600 hover:text-red-400 text-xs">
               Delete
             </button>
           </div>

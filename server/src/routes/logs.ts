@@ -44,6 +44,12 @@ export async function logsRoutes(app: FastifyInstance) {
         summary = "Logged in";
       } else if (entry.type === "page_view") {
         summary = `Viewed ${details.path ?? "page"}`;
+      } else if (entry.type === "label_created") {
+        summary = `Created label template "${details.name ?? details.id}"`;
+      } else if (entry.type === "label_updated") {
+        summary = `Edited label template "${details.name ?? details.id}"`;
+      } else if (entry.type === "label_deleted") {
+        summary = `Deleted label template "${details.name ?? details.id}"`;
       }
       return {
         id: `log-${entry.id}`,

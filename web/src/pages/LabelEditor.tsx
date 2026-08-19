@@ -3,6 +3,7 @@ import { useNavigate, useParams, Link } from "react-router-dom";
 import { api } from "../lib/api";
 import { renderLabelToCanvas } from "../lib/renderLabel";
 import { trimWhitespace } from "../lib/imageTrim";
+import { useToast } from "../components/ToastProvider";
 import {
   applyFolderLevels,
   DATA_FIELDS,
@@ -73,6 +74,7 @@ export default function LabelEditor() {
   const { id } = useParams();
   const isNew = id === "new";
   const navigate = useNavigate();
+  const { showToast } = useToast();
 
   const [name, setName] = useState("New template");
   const [widthMm, setWidthMm] = useState(62);
@@ -270,6 +272,9 @@ export default function LabelEditor() {
       } else if (id) {
         await api.updateLabel(id, template);
       }
+      showToast("success", "Template saved");
+    } catch (err) {
+      showToast("error", `Couldn't save template: ${(err as Error).message}`);
     } finally {
       setSaving(false);
     }

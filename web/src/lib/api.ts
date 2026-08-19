@@ -11,7 +11,12 @@ export interface RentmanListResponse<T = RentmanRecord> {
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
   const res = await fetch(path, {
     headers: {
-      "Content-Type": "application/json",
+      // Fastify's JSON body parser rejects an empty body when Content-Type
+      // says application/json (FST_ERR_CTP_EMPTY_JSON_BODY) — real problem
+      // for bodyless calls like DELETE, so only send it when there's
+      // actually a body (init.body is always a JSON string here, never
+      // FormData/etc, so this check is exactly "did the caller pass one").
+      ...(init?.body ? { "Content-Type": "application/json" } : {}),
       ...(pb.authStore.token ? { Authorization: `Bearer ${pb.authStore.token}` } : {}),
     },
     ...init,
