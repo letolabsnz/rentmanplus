@@ -97,6 +97,28 @@ async function drawElement(
   context: LabelDataContext,
   scalePxPerMm: number,
 ) {
+  const rotation = el.rotation ?? 0;
+  ctx.save();
+  try {
+    if (rotation !== 0) {
+      const cx = (el.x + el.width / 2) * scalePxPerMm;
+      const cy = (el.y + el.height / 2) * scalePxPerMm;
+      ctx.translate(cx, cy);
+      ctx.rotate((rotation * Math.PI) / 180);
+      ctx.translate(-cx, -cy);
+    }
+    await drawElementContent(ctx, el, context, scalePxPerMm);
+  } finally {
+    ctx.restore();
+  }
+}
+
+async function drawElementContent(
+  ctx: CanvasRenderingContext2D,
+  el: LabelElement,
+  context: LabelDataContext,
+  scalePxPerMm: number,
+) {
   const x = el.x * scalePxPerMm;
   const y = el.y * scalePxPerMm;
   const w = el.width * scalePxPerMm;

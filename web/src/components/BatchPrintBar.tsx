@@ -12,6 +12,7 @@ export default function BatchPrintBar({
   onDone: () => void;
 }) {
   const [open, setOpen] = useState(false);
+  const [copies, setCopies] = useState(1);
   const [progress, setProgress] = useState<{ done: number; total: number; failed: string[] } | null>(null);
 
   const { data: templates } = useQuery({ queryKey: ["labels"], queryFn: api.listLabels, enabled: open });
@@ -21,19 +22,24 @@ export default function BatchPrintBar({
     if (!template) return;
     setOpen(false);
     const failed: string[] = [];
-    setProgress({ done: 0, total: assets.length, failed });
+    const total = assets.length * copies;
+    setProgress({ done: 0, total, failed });
 
     // Sequential, not parallel — the printer processes one job at a time and
     // flooding it with concurrent requests risks jobs arriving out of order
     // or overwhelming the network backend.
-    for (const [i, asset] of assets.entries()) {
-      try {
-        const result = await printAsset(asset, template);
-        if (!result.ok) failed.push(asset.displayname ?? String(asset.id));
-      } catch {
-        failed.push(asset.displayname ?? String(asset.id));
+    let done = 0;
+    for (const asset of assets) {
+      for (let copy = 0; copy < copies; copy++) {
+        try {
+          const result = await printAsset(asset, template);
+          if (!result.ok) failed.push(asset.displayname ?? String(asset.id));
+        } catch {
+          failed.push(asset.displayname ?? String(asset.id));
+        }
+        done++;
+        setProgress({ done, total, failed: [...failed] });
       }
-      setProgress({ done: i + 1, total: assets.length, failed: [...failed] });
     }
 
     if (failed.length === 0) {
@@ -65,11 +71,23 @@ export default function BatchPrintBar({
   return (
     <div className="relative flex items-center gap-3 border border-neutral-800 rounded-lg px-4 py-2 text-sm bg-neutral-950">
       <span className="font-medium">{assets.length} selected</span>
+
+      <label className="flex items-center gap-2 text-neutral-500">
+        Copies each
+        <input
+          type="number"
+          min={1}
+          value={copies}
+          onChange={(e) => setCopies(Math.max(1, Number(e.target.value)))}
+          className="w-14 bg-neutral-900 border border-neutral-800 rounded px-2 py-1 text-white"
+        />
+      </label>
+
       <button
         onClick={() => setOpen((v) => !v)}
         className="px-3 py-1 rounded-md bg-white text-black font-medium hover:bg-neutral-200"
       >
-        Print labels
+        Print {assets.length * copies} label{assets.length * copies === 1 ? "" : "s"}
       </button>
       <button onClick={onDone} className="text-neutral-500 hover:text-white ml-auto">
         Clear selection

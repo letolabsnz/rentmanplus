@@ -2,12 +2,14 @@ import { useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import { api, type Equipment } from "../lib/api";
+import RefreshButton from "../components/RefreshButton";
 
 export default function EquipmentList() {
   const [search, setSearch] = useState("");
   const { data, isLoading, error } = useQuery({
     queryKey: ["equipment"],
     queryFn: api.listEquipment,
+    refetchInterval: 60_000,
   });
 
   const filtered = useMemo(() => {
@@ -19,14 +21,17 @@ export default function EquipmentList() {
 
   return (
     <div className="max-w-4xl mx-auto flex flex-col gap-4">
-      <div className="flex items-center justify-between">
+      <div className="flex items-center justify-between gap-3">
         <h1 className="text-xl font-semibold">Assets</h1>
-        <input
-          value={search}
-          onChange={(e) => setSearch(e.target.value)}
-          placeholder="Search equipment, code, tag…"
-          className="bg-neutral-900 border border-neutral-800 rounded-md px-3 py-1.5 text-sm w-72 focus:outline-none focus:border-neutral-600"
-        />
+        <div className="flex items-center gap-3">
+          <input
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            placeholder="Search equipment, code, tag…"
+            className="bg-neutral-900 border border-neutral-800 rounded-md px-3 py-1.5 text-sm w-72 focus:outline-none focus:border-neutral-600"
+          />
+          <RefreshButton queryKeys={[["equipment"]]} />
+        </div>
       </div>
 
       {isLoading && <p className="text-neutral-500 text-sm">Loading…</p>}

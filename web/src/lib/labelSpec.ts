@@ -20,6 +20,7 @@ export interface LabelElement {
   lockAspect?: boolean; // resize keeps width:height fixed — QR codes and images generally want this
   imageData?: string; // data: URL, image only — a logo/icon baked into the template
   folderLevels?: number[]; // dataField === "equipmentFolder" only — 1-indexed path segments to include; empty/unset = full path
+  rotation?: 0 | 90 | 180 | 270; // any element type — rotates around the box's own center
 }
 
 export interface LabelTemplateData {

@@ -114,6 +114,7 @@ export const rentman = {
 
   listStockLocations: list("stocklocations"),
   listAllFolders: listAll("folders"),
+  listAllStockMovements: listAll("stockmovements"),
 
   // Rentman relates records by path-style references, e.g. an equipment
   // field like "/equipment/2989" rather than an embedded object or bare id.

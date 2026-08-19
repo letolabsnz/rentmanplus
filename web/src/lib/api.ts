@@ -81,6 +81,10 @@ export const api = {
     imageDataUrl: string;
     label: string;
   }) => request<{ ok: boolean; message: string }>("/api/print", { method: "POST", body: JSON.stringify(args) }),
+
+  // Bypasses the server's 60s Rentman cache — use when you need a
+  // guaranteed-fresh read right now (e.g. "I just added this in Rentman").
+  refresh: () => request<{ ok: boolean }>("/api/refresh", { method: "POST" }),
 };
 
 export interface ScanEvent {

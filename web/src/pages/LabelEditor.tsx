@@ -16,6 +16,36 @@ import {
 
 const EDITOR_SCALE = 6; // px per mm on screen — print export uses the printer's real dots-per-mm instead
 
+function rotate(current: LabelElement["rotation"], deltaDeg: -90 | 90): 0 | 90 | 180 | 270 {
+  return (((current ?? 0) + deltaDeg + 360) % 360) as 0 | 90 | 180 | 270;
+}
+
+// The resize handle sits at the box's local bottom-right corner. Rotation
+// happens around the box's *center*, so if we resize by just changing
+// width/height and leaving x/y numerically alone, the center shifts and the
+// whole rotated box visually drifts instead of growing from the corner
+// opposite the handle. This solves for the new x/y that keeps that opposite
+// corner's on-screen position fixed as width/height change.
+function resizeKeepingAnchor(
+  orig: Pick<LabelElement, "x" | "y" | "width" | "height" | "rotation">,
+  newWidth: number,
+  newHeight: number,
+): { x: number; y: number } {
+  const rad = ((orig.rotation ?? 0) * Math.PI) / 180;
+  const cos = Math.cos(rad);
+  const sin = Math.sin(rad);
+  const rotateVec = (vx: number, vy: number) => ({ x: vx * cos - vy * sin, y: vx * sin + vy * cos });
+
+  const origCenter = { x: orig.x + orig.width / 2, y: orig.y + orig.height / 2 };
+  const anchorOffset = rotateVec(-orig.width / 2, -orig.height / 2);
+  const anchor = { x: origCenter.x + anchorOffset.x, y: origCenter.y + anchorOffset.y };
+
+  const newAnchorOffset = rotateVec(-newWidth / 2, -newHeight / 2);
+  const newCenter = { x: anchor.x - newAnchorOffset.x, y: anchor.y - newAnchorOffset.y };
+
+  return { x: newCenter.x - newWidth / 2, y: newCenter.y - newHeight / 2 };
+}
+
 function newElement(type: Exclude<ElementType, "image">): LabelElement {
   const base = { id: crypto.randomUUID(), x: 2, y: 2 };
   switch (type) {
@@ -99,18 +129,38 @@ export default function LabelEditor() {
         if (drag.mode === "move") {
           // No clamp to 0 — elements (a logo, a background block) can be
           // dragged partially or fully off any edge for a bleed effect.
+          // Moving is a pure translation, unaffected by the box's own
+          // rotation, so the raw screen delta applies as-is.
           return { ...el, x: Math.round(drag.orig.x + dxMm), y: Math.round(drag.orig.y + dyMm) };
         }
-        const width = Math.max(2, Math.round(drag.orig.width + dxMm));
-        const height = Math.max(2, Math.round(drag.orig.height + dyMm));
-        if (!el.lockAspect) return { ...el, width, height };
 
-        // Keep the element's original width:height ratio — driven by
-        // whichever axis the pointer moved further along.
-        const ratio = drag.orig.width / drag.orig.height;
-        return Math.abs(dxMm) >= Math.abs(dyMm)
-          ? { ...el, width, height: Math.max(2, Math.round(width / ratio)) }
-          : { ...el, width: Math.max(2, Math.round(height * ratio)), height };
+        // The resize handle is rendered rotated with the box (it's a CSS
+        // transform on screen), so a screen-space drag has to be rotated
+        // back into the box's own (unrotated) coordinate frame before it
+        // means "grow width" / "grow height" — otherwise dragging the
+        // handle on a 90°-rotated element would resize the wrong axis.
+        const rad = ((drag.orig.rotation ?? 0) * Math.PI) / 180;
+        const localDx = dxMm * Math.cos(rad) + dyMm * Math.sin(rad);
+        const localDy = -dxMm * Math.sin(rad) + dyMm * Math.cos(rad);
+
+        let width = Math.max(2, Math.round(drag.orig.width + localDx));
+        let height = Math.max(2, Math.round(drag.orig.height + localDy));
+        if (el.lockAspect) {
+          // Keep the element's original width:height ratio — driven by
+          // whichever axis the pointer moved further along.
+          const ratio = drag.orig.width / drag.orig.height;
+          if (Math.abs(localDx) >= Math.abs(localDy)) {
+            height = Math.max(2, Math.round(width / ratio));
+          } else {
+            width = Math.max(2, Math.round(height * ratio));
+          }
+        }
+
+        // Recompute x/y so the corner opposite the handle stays visually
+        // fixed on screen instead of drifting as the rotated box's center
+        // shifts with its new size.
+        const { x, y } = resizeKeepingAnchor(drag.orig, width, height);
+        return { ...el, x: Math.round(x), y: Math.round(y), width, height };
       }),
     );
   }
@@ -179,6 +229,36 @@ export default function LabelEditor() {
     setElements((prev) => prev.filter((el) => el.id !== selectedId));
     setSelectedId(null);
   }
+
+  function duplicate(source: LabelElement) {
+    const copy: LabelElement = { ...source, id: crypto.randomUUID(), x: source.x + 4, y: source.y + 4 };
+    setElements((prev) => [...prev, copy]);
+    setSelectedId(copy.id);
+    return copy;
+  }
+
+  // Copy/paste the selected element with Cmd/Ctrl+C / Cmd/Ctrl+V — skipped
+  // while focus is in a text input (template name, static text, font size,
+  // etc.) so normal text copy/paste there isn't hijacked.
+  const clipboardRef = useRef<LabelElement | null>(null);
+  useEffect(() => {
+    function isEditingText() {
+      const tag = document.activeElement?.tagName;
+      return tag === "INPUT" || tag === "TEXTAREA";
+    }
+    function onKeyDown(e: KeyboardEvent) {
+      if (!(e.metaKey || e.ctrlKey) || isEditingText()) return;
+      if (e.key === "c" && selectedId) {
+        const el = elements.find((el) => el.id === selectedId);
+        if (el) clipboardRef.current = el;
+      } else if (e.key === "v" && clipboardRef.current) {
+        e.preventDefault();
+        duplicate(clipboardRef.current);
+      }
+    }
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, [elements, selectedId]);
 
   async function save() {
     setSaving(true);
@@ -315,6 +395,7 @@ export default function LabelEditor() {
                   top: el.y * EDITOR_SCALE,
                   width: el.width * EDITOR_SCALE,
                   height: el.height * EDITOR_SCALE,
+                  transform: el.rotation ? `rotate(${el.rotation}deg)` : undefined,
                 }}
               >
                 {el.id === selectedId && (
@@ -524,6 +605,27 @@ export default function LabelEditor() {
                 </>
               )}
 
+              <label className="flex flex-col gap-1">
+                <span className="text-neutral-500">Rotation</span>
+                <div className="flex items-center gap-2">
+                  <button
+                    onClick={() => updateSelected({ rotation: rotate(selected.rotation, -90) })}
+                    className="px-2 py-1 rounded border border-neutral-800 hover:bg-neutral-900"
+                    title="Rotate left 90°"
+                  >
+                    ⟲ Left
+                  </button>
+                  <button
+                    onClick={() => updateSelected({ rotation: rotate(selected.rotation, 90) })}
+                    className="px-2 py-1 rounded border border-neutral-800 hover:bg-neutral-900"
+                    title="Rotate right 90°"
+                  >
+                    ⟳ Right
+                  </button>
+                  <span className="text-neutral-500 text-xs">{selected.rotation ?? 0}°</span>
+                </div>
+              </label>
+
               <div className="grid grid-cols-2 gap-2 text-xs text-neutral-500">
                 <span>x: {selected.x}mm</span>
                 <span>y: {selected.y}mm</span>
@@ -531,9 +633,15 @@ export default function LabelEditor() {
                 <span>h: {selected.height}mm</span>
               </div>
 
-              <button onClick={deleteSelected} className="text-red-400 text-left hover:text-red-300 mt-2">
-                Delete element
-              </button>
+              <div className="flex items-center gap-3 mt-2">
+                <button onClick={() => duplicate(selected)} className="text-neutral-400 hover:text-white">
+                  Duplicate
+                </button>
+                <button onClick={deleteSelected} className="text-red-400 hover:text-red-300">
+                  Delete element
+                </button>
+              </div>
+              <p className="text-xs text-neutral-600">Cmd/Ctrl+C then Cmd/Ctrl+V also works.</p>
             </div>
           )}
         </div>

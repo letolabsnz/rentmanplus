@@ -20,6 +20,7 @@ const elementSchema = z.object({
   lockAspect: z.boolean().optional(),
   imageData: z.string().optional(), // data: URL, image only
   folderLevels: z.array(z.number()).optional(),
+  rotation: z.union([z.literal(0), z.literal(90), z.literal(180), z.literal(270)]).optional(),
 });
 
 const templateBody = z.object({
