@@ -31,7 +31,15 @@ export async function renderLabelToCanvas(
   const canvas = document.createElement("canvas");
   canvas.width = Math.max(1, Math.round(template.widthMm * scalePxPerMm));
   canvas.height = Math.max(1, Math.round(template.heightMm * scalePxPerMm));
-  const ctx = canvas.getContext("2d");
+  // Every caller reads this canvas back via toDataURL() right after
+  // rendering (print export, or just grabbing pixels). Without this hint
+  // the browser defaults to a GPU-backed canvas, and reading pixels back
+  // out of a GPU-backed canvas is a known crash path on some Windows
+  // Chrome/Edge GPU driver combos — the whole page goes black and needs a
+  // reload, print still succeeds because the crash is purely client-side
+  // rendering, after the image data was already generated. Forcing a
+  // software-backed canvas here sidesteps the GPU path entirely.
+  const ctx = canvas.getContext("2d", { willReadFrequently: true });
   if (!ctx) return canvas;
 
   ctx.fillStyle = "white";

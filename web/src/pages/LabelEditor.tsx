@@ -3,6 +3,7 @@ import { useNavigate, useParams, Link } from "react-router-dom";
 import { api } from "../lib/api";
 import { renderLabelToCanvas } from "../lib/renderLabel";
 import { trimWhitespace } from "../lib/imageTrim";
+import { generateId } from "../lib/id";
 import { useToast } from "../components/ToastProvider";
 import {
   applyFolderLevels,
@@ -48,7 +49,7 @@ function resizeKeepingAnchor(
 }
 
 function newElement(type: Exclude<ElementType, "image">): LabelElement {
-  const base = { id: crypto.randomUUID(), x: 2, y: 2 };
+  const base = { id: generateId(), x: 2, y: 2 };
   switch (type) {
     case "text":
       return { ...base, type, width: 30, height: 6, dataField: "displayname", fontSize: 4 };
@@ -209,7 +210,7 @@ export default function LabelEditor() {
     const width = 20;
     const height = Math.max(2, Math.round((width * naturalHeight) / naturalWidth));
     const el: LabelElement = {
-      id: crypto.randomUUID(),
+      id: generateId(),
       type: "image",
       x: 2,
       y: 2,
@@ -233,7 +234,7 @@ export default function LabelEditor() {
   }
 
   function duplicate(source: LabelElement) {
-    const copy: LabelElement = { ...source, id: crypto.randomUUID(), x: source.x + 4, y: source.y + 4 };
+    const copy: LabelElement = { ...source, id: generateId(), x: source.x + 4, y: source.y + 4 };
     setElements((prev) => [...prev, copy]);
     setSelectedId(copy.id);
     return copy;

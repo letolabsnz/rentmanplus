@@ -1,4 +1,5 @@
 import { createContext, useCallback, useContext, useEffect, useState, type ReactNode } from "react";
+import { generateId } from "../lib/id";
 
 interface Toast {
   id: string;
@@ -22,7 +23,7 @@ export function ToastProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const showToast = useCallback((type: Toast["type"], message: string) => {
-    setToasts((prev) => [...prev, { id: crypto.randomUUID(), type, message }]);
+    setToasts((prev) => [...prev, { id: generateId(), type, message }]);
   }, []);
 
   return (
