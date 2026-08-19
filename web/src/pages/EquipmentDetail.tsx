@@ -77,20 +77,11 @@ export default function EquipmentDetail() {
                     checked={selected.has(String(sn.id))}
                     onChange={() => toggle(String(sn.id))}
                   />
-                  <Link to={`/assets/${sn.id}`} className="flex-1 flex items-center justify-between gap-4 min-w-0">
-                    <div className="flex flex-col min-w-0">
-                      <span className="font-medium truncate">{sn.displayname}</span>
-                      <span className="text-neutral-500 text-xs truncate">
-                        {(sn._location?.displayname as string) ?? "no location"}
-                        {sn.qrcodes ? ` · ${sn.qrcodes}` : ""}
-                      </span>
-                    </div>
-                    <span
-                      className={`text-xs font-semibold px-2 py-0.5 rounded-full shrink-0 ${
-                        sn._status === "OUT" ? "bg-amber-900 text-amber-300" : "bg-emerald-900 text-emerald-300"
-                      }`}
-                    >
-                      {sn._status === "OUT" ? "Out" : "In"}
+                  <Link to={`/assets/${sn.id}`} className="flex-1 flex flex-col min-w-0">
+                    <span className="font-medium truncate">{sn.displayname}</span>
+                    <span className="text-neutral-500 text-xs truncate">
+                      {(sn._location?.displayname as string) ?? "no location"}
+                      {sn.qrcodes ? ` · ${sn.qrcodes}` : ""}
                     </span>
                   </Link>
                 </div>

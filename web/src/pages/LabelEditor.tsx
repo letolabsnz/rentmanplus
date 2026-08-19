@@ -83,7 +83,7 @@ export default function LabelEditor() {
 
   useEffect(() => {
     if (isNew || !id) return;
-    api.getLabel(Number(id)).then((t) => {
+    api.getLabel(id).then((t) => {
       setName(t.name);
       setWidthMm(t.widthMm);
       setHeightMm(t.heightMm);
@@ -267,8 +267,8 @@ export default function LabelEditor() {
       if (isNew) {
         const created = await api.createLabel(template);
         navigate(`/labels/${created.id}`, { replace: true });
-      } else {
-        await api.updateLabel(Number(id), template);
+      } else if (id) {
+        await api.updateLabel(id, template);
       }
     } finally {
       setSaving(false);
@@ -279,8 +279,8 @@ export default function LabelEditor() {
 
   return (
     <div className="max-w-5xl mx-auto flex flex-col gap-4">
-      <Link to="/labels" className="text-sm text-neutral-500 hover:text-white w-fit">
-        ← Labels
+      <Link to="/settings/labels" className="text-sm text-neutral-500 hover:text-white w-fit">
+        ← Settings
       </Link>
 
       <div className="flex items-center justify-between">

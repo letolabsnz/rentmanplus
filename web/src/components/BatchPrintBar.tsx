@@ -17,7 +17,7 @@ export default function BatchPrintBar({
 
   const { data: templates } = useQuery({ queryKey: ["labels"], queryFn: api.listLabels, enabled: open });
 
-  async function printAllWith(templateId: number) {
+  async function printAllWith(templateId: string) {
     const template = templates?.find((t) => t.id === templateId);
     if (!template) return;
     setOpen(false);

@@ -24,7 +24,7 @@ export interface LabelElement {
 }
 
 export interface LabelTemplateData {
-  id?: number;
+  id?: string;
   name: string;
   widthMm: number;
   heightMm: number;

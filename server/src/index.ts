@@ -8,7 +8,11 @@ import { equipmentRoutes } from "./routes/equipment.js";
 import { projectRoutes } from "./routes/projects.js";
 import { labelRoutes } from "./routes/labels.js";
 import { printRoutes } from "./routes/print.js";
+import { settingsRoutes } from "./routes/settings.js";
+import { statsRoutes } from "./routes/stats.js";
+import { logsRoutes } from "./routes/logs.js";
 import { clearRentmanCache } from "./rentman/client.js";
+import { requireAuth } from "./auth.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
@@ -16,11 +20,18 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 // a base64 logo image or a printed label PNG.
 const app = Fastify({ logger: true, bodyLimit: 15 * 1024 * 1024 });
 
+// Root-level hook (not inside app.register()) so it actually applies to
+// every route plugin below — see the comment on requireAuth for why.
+app.addHook("preHandler", requireAuth);
+
 await app.register(assetRoutes);
 await app.register(equipmentRoutes);
 await app.register(projectRoutes);
 await app.register(labelRoutes);
 await app.register(printRoutes);
+await app.register(settingsRoutes);
+await app.register(statsRoutes);
+await app.register(logsRoutes);
 
 // Manual escape hatch for the 60s Rentman cache — lets the UI force a
 // truly fresh read instead of waiting out the window.

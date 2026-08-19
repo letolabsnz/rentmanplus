@@ -1,4 +1,5 @@
 import type { LabelTemplateData } from "./labelSpec";
+import { pb } from "./pocketbase";
 
 export type RentmanRecord = Record<string, unknown> & { id: string };
 
@@ -9,7 +10,10 @@ export interface RentmanListResponse<T = RentmanRecord> {
 
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
   const res = await fetch(path, {
-    headers: { "Content-Type": "application/json" },
+    headers: {
+      "Content-Type": "application/json",
+      ...(pb.authStore.token ? { Authorization: `Bearer ${pb.authStore.token}` } : {}),
+    },
     ...init,
   });
   if (!res.ok) {
@@ -35,7 +39,6 @@ export interface SerialNumber extends RentmanRecord {
   _equipment: RentmanRecord | null;
   _location: RentmanRecord | null;
   _folder: RentmanRecord | null;
-  _status?: "OUT" | "IN";
 }
 
 // Confirmed against a live Rentman token — see server/src/routes/equipment.ts.
@@ -52,8 +55,7 @@ export interface Equipment extends RentmanRecord {
 
 export const api = {
   listAssets: () => request<RentmanListResponse<SerialNumber>>("/api/assets"),
-  getAsset: (id: string) =>
-    request<SerialNumber & { _lastSubproject: RentmanRecord | null; _scan: ScanOverlay }>(`/api/assets/${id}`),
+  getAsset: (id: string) => request<SerialNumber & { _lastSubproject: RentmanRecord | null }>(`/api/assets/${id}`),
 
   listEquipment: () => request<RentmanListResponse<Equipment>>("/api/equipment"),
   getEquipment: (id: string) => request<Equipment & { serialNumbers: SerialNumber[] }>(`/api/equipment/${id}`),
@@ -63,44 +65,56 @@ export const api = {
   getProjectEquipment: (id: string) =>
     request<{ lines: RentmanRecord[]; groups: RentmanRecord[] }>(`/api/projects/${id}/equipment`),
 
-  listLabels: () => request<(LabelTemplateData & { id: number })[]>("/api/labels"),
-  getLabel: (id: number) => request<LabelTemplateData & { id: number }>(`/api/labels/${id}`),
+  listLabels: () => request<(LabelTemplateData & { id: string })[]>("/api/labels"),
+  getLabel: (id: string) => request<LabelTemplateData & { id: string }>(`/api/labels/${id}`),
   createLabel: (template: LabelTemplateData) =>
-    request<LabelTemplateData & { id: number }>("/api/labels", { method: "POST", body: JSON.stringify(template) }),
-  updateLabel: (id: number, template: LabelTemplateData) =>
-    request<LabelTemplateData & { id: number }>(`/api/labels/${id}`, {
+    request<LabelTemplateData & { id: string }>("/api/labels", { method: "POST", body: JSON.stringify(template) }),
+  updateLabel: (id: string, template: LabelTemplateData) =>
+    request<LabelTemplateData & { id: string }>(`/api/labels/${id}`, {
       method: "PUT",
       body: JSON.stringify(template),
     }),
-  deleteLabel: (id: number) => request<{ ok: true }>(`/api/labels/${id}`, { method: "DELETE" }),
+  deleteLabel: (id: string) => request<{ ok: true }>(`/api/labels/${id}`, { method: "DELETE" }),
 
-  print: (args: {
-    templateId: number;
-    rentmanSerialNumberId: string;
-    who?: string;
-    imageDataUrl: string;
-    label: string;
-  }) => request<{ ok: boolean; message: string }>("/api/print", { method: "POST", body: JSON.stringify(args) }),
+  print: (args: { templateId: string; rentmanSerialNumberId: string; imageDataUrl: string; label: string }) =>
+    request<{ ok: boolean; message: string }>("/api/print", { method: "POST", body: JSON.stringify(args) }),
 
   // Bypasses the server's 60s Rentman cache — use when you need a
   // guaranteed-fresh read right now (e.g. "I just added this in Rentman").
   refresh: () => request<{ ok: boolean }>("/api/refresh", { method: "POST" }),
+
+  getSettings: () => request<Settings>("/api/settings"),
+  updateSettings: (settings: { printerHost: string }) =>
+    request<Settings>("/api/settings", { method: "PUT", body: JSON.stringify(settings) }),
+
+  getStats: () => request<Stats>("/api/stats"),
+  getLogs: () => request<LogEntry[]>("/api/logs"),
+  logEvent: (type: string, details?: Record<string, unknown>) =>
+    request<LogEntry>("/api/logs", { method: "POST", body: JSON.stringify({ type, details }) }),
 };
 
-export interface ScanEvent {
-  id: number;
-  rentmanSerialNumberId: string;
-  direction: "OUT" | "IN";
-  projectId: string | null;
-  who: string | null;
-  note: string | null;
-  createdAt: string;
+export interface Settings {
+  id: string;
+  printerHost: string;
 }
 
-export interface ScanOverlay {
-  status: "OUT" | "IN";
-  lastEvent: ScanEvent | null;
-  history: ScanEvent[];
+export interface Stats {
+  equipmentTypes: number;
+  totalStockUnits: number;
+  trackedSerials: number;
+  projects: number;
+  labelTemplates: number;
+  labelsPrinted: number;
+  crewAccounts: number;
+}
+
+export interface LogEntry {
+  id: string;
+  type: string;
+  who: string | null;
+  timestamp: string;
+  summary: string;
+  details: Record<string, unknown>;
 }
 
 // Best-effort helpers for reading Rentman's loosely-typed records — field

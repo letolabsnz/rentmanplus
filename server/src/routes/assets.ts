@@ -1,8 +1,5 @@
 import type { FastifyInstance } from "fastify";
-import { z } from "zod";
 import { rentman, type RentmanRecord } from "../rentman/client.js";
-import { db } from "../db.js";
-import { attachScanStatus } from "../scan.js";
 
 function idFromRef(ref: unknown): string | null {
   return typeof ref === "string" ? (ref.split("/").pop() ?? null) : null;
@@ -35,30 +32,10 @@ export async function enrichSerialNumbers(records: RentmanRecord[]) {
   });
 }
 
-async function scanOverlayFor(rentmanSerialNumberId: string) {
-  const history = await db.scanEvent.findMany({
-    where: { rentmanSerialNumberId },
-    orderBy: { createdAt: "desc" },
-  });
-  return {
-    status: history[0]?.direction === "OUT" ? "OUT" : "IN",
-    lastEvent: history[0] ?? null,
-    history,
-  };
-}
-
-const scanBody = z.object({
-  direction: z.enum(["OUT", "IN"]),
-  projectId: z.string().optional(),
-  who: z.string().optional(),
-  note: z.string().optional(),
-});
-
 export async function assetRoutes(app: FastifyInstance) {
   app.get("/api/assets", async () => {
     const data = await rentman.listAllSerialNumbers();
-    const enriched = await enrichSerialNumbers(data);
-    return { data: await attachScanStatus(enriched) };
+    return { data: await enrichSerialNumbers(data) };
   });
 
   app.get("/api/assets/:id", async (req, reply) => {
@@ -68,34 +45,10 @@ export async function assetRoutes(app: FastifyInstance) {
       const [enriched] = await enrichSerialNumbers([asset]);
       const lastSubproject =
         typeof asset.last_subproject === "string" ? await rentman.resolveRef(asset.last_subproject) : null;
-      const overlay = await scanOverlayFor(id);
-      return { ...enriched, _lastSubproject: lastSubproject, _scan: overlay };
+      return { ...enriched, _lastSubproject: lastSubproject };
     } catch (err) {
       req.log.error(err);
       return reply.code(404).send({ error: "Asset not found" });
     }
-  });
-
-  app.post("/api/assets/:id/scan", async (req, reply) => {
-    const { id } = req.params as { id: string };
-    const parsed = scanBody.safeParse(req.body);
-    if (!parsed.success) {
-      return reply.code(400).send({ error: parsed.error.flatten() });
-    }
-    const event = await db.scanEvent.create({
-      data: {
-        rentmanSerialNumberId: id,
-        direction: parsed.data.direction,
-        projectId: parsed.data.projectId,
-        who: parsed.data.who,
-        note: parsed.data.note,
-      },
-    });
-    return event;
-  });
-
-  app.get("/api/assets/:id/scans", async (req) => {
-    const { id } = req.params as { id: string };
-    return scanOverlayFor(id);
   });
 }

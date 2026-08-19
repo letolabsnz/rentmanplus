@@ -6,7 +6,7 @@ export type PrintableAsset = SerialNumber & { _lastSubproject?: RentmanRecord | 
 
 export async function printAsset(
   asset: PrintableAsset,
-  template: LabelTemplateData & { id: number },
+  template: LabelTemplateData & { id: string },
 ): Promise<{ ok: boolean; message: string }> {
   const context = buildLabelContext(asset);
   const canvas = await renderLabelToCanvas(template, context, dotsPerMm(template.widthMm));

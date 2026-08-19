@@ -1,0 +1,35 @@
+services:
+  pocketbase:
+    build: ./pocketbase
+    container_name: rentmanplus-pocketbase
+    ports:
+      # Published so the browser can talk to it directly (PocketBase's SDK is
+      # designed to be hit straight from the client, not proxied) — set
+      # VITE_POCKETBASE_URL to this host's LAN address, same idea as PRINTER_HOST.
+      - "8080:8080"
+    env_file:
+      - pocketbase/.env
+    volumes:
+      - pb_data:/pb/pb_data
+    restart: unless-stopped
+
+  app:
+    container_name: rentmanplus-app
+    build:
+      context: .
+      args:
+        # Baked into the web bundle at build time — must match wherever the
+        # browser can reach the pocketbase service above (see its comment).
+        VITE_POCKETBASE_URL: ${VITE_POCKETBASE_URL:-http://localhost:8080}
+    ports:
+      - "3001:3001"
+    env_file:
+      - server/.env
+    environment:
+      POCKETBASE_URL: http://pocketbase:8080
+    depends_on:
+      - pocketbase
+    restart: unless-stopped
+
+volumes:
+  pb_data:

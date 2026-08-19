@@ -12,7 +12,7 @@ export default function PrintButton({ asset }: { asset: PrintableAsset }) {
 
   const { data: templates } = useQuery({ queryKey: ["labels"], queryFn: api.listLabels, enabled: open });
 
-  async function printWith(templateId: number) {
+  async function printWith(templateId: string) {
     const template = templates?.find((t) => t.id === templateId);
     if (!template) return;
     setPrinting(true);

@@ -1,12 +1,10 @@
 node_modules
+**/node_modules
 dist
-dist-ssr
-*.local
+**/dist
+.git
 .DS_Store
-
-.env
 server/.env
 server/dev.db
 server/dev.db-journal
-pocketbase/.env
-print_jobs_backup.json
+print/venv

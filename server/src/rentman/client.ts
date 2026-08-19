@@ -24,7 +24,14 @@ export interface RentmanListResponse<T> {
 
 export type RentmanRecord = Record<string, unknown> & { id: string };
 
-const CACHE_TTL_MS = 60_000;
+// The equipment/stock-movement lists this backs are the full catalog + the
+// entire historical movement ledger (no filtering) — walking every page of
+// both from Rentman is expensive, and it only gets slower as the ledger
+// grows. 60s meant the web app's 60s poll (see EquipmentList/ProjectsList)
+// forced a full re-walk every single minute, forever. 5 minutes still keeps
+// data reasonably fresh; the "Refresh" button bypasses this for an
+// immediate read.
+const CACHE_TTL_MS = 5 * 60_000;
 const cache = new Map<string, { expiresAt: number; value: unknown }>();
 
 async function rentmanFetch<T>(path: string, searchParams?: Record<string, string | number | undefined>): Promise<T> {

@@ -9,7 +9,10 @@ export default function EquipmentList() {
   const { data, isLoading, error } = useQuery({
     queryKey: ["equipment"],
     queryFn: api.listEquipment,
-    refetchInterval: 60_000,
+    // Matches the server's Rentman cache TTL (see rentman/client.ts) — polling
+    // faster than that just forces an expensive full catalog + full
+    // stock-movement-history re-walk against Rentman for no fresher data.
+    refetchInterval: 5 * 60_000,
   });
 
   const filtered = useMemo(() => {

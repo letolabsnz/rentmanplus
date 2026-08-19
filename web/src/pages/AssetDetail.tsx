@@ -36,13 +36,6 @@ export default function AssetDetail() {
               </p>
             </div>
             <div className="flex items-center gap-3 shrink-0">
-              <span
-                className={`text-xs font-semibold px-2 py-1 rounded-full ${
-                  asset._scan.status === "OUT" ? "bg-amber-900 text-amber-300" : "bg-emerald-900 text-emerald-300"
-                }`}
-              >
-                {asset._scan.status === "OUT" ? "Checked out" : "In stock"}
-              </span>
               <PrintButton asset={asset} />
             </div>
           </div>
@@ -93,22 +86,6 @@ export default function AssetDetail() {
               <RecordFields record={asset} />
             </div>
           </details>
-
-          <section className="border border-neutral-800 rounded-lg p-4">
-            <h2 className="text-sm font-semibold text-neutral-400 mb-3">Scan history</h2>
-            {asset._scan.history.length === 0 ? (
-              <p className="text-neutral-500 text-sm">No scans recorded yet. Scan in/out lands in phase 2.</p>
-            ) : (
-              <ul className="flex flex-col gap-1 text-sm">
-                {asset._scan.history.map((e) => (
-                  <li key={e.id} className="flex justify-between text-neutral-300">
-                    <span>{e.direction === "OUT" ? "Checked out" : "Returned"}</span>
-                    <span className="text-neutral-500">{new Date(e.createdAt).toLocaleString()}</span>
-                  </li>
-                ))}
-              </ul>
-            )}
-          </section>
         </>
       )}
     </div>

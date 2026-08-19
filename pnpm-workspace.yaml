@@ -2,7 +2,4 @@ packages:
   - "server"
   - "web"
 allowBuilds:
-  '@prisma/client': true
-  '@prisma/engines': true
   esbuild: true
-  prisma: true

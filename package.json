@@ -7,6 +7,6 @@
     "dev:web": "pnpm --filter web dev",
     "build:web": "pnpm --filter web build",
     "build:server": "pnpm --filter server build",
-    "db:migrate": "pnpm --filter server exec prisma migrate dev"
+    "migrate:pocketbase": "pnpm --filter server exec tsx scripts/migrate-to-pocketbase.ts"
   }
 }

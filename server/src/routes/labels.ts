@@ -1,6 +1,5 @@
 import type { FastifyInstance } from "fastify";
 import { z } from "zod";
-import { db } from "../db.js";
 
 const elementSchema = z.object({
   id: z.string(),
@@ -31,43 +30,35 @@ const templateBody = z.object({
 });
 
 export async function labelRoutes(app: FastifyInstance) {
-  app.get("/api/labels", async () => {
-    const templates = await db.labelTemplate.findMany({ orderBy: { name: "asc" } });
-    return templates.map((t) => ({ ...t, elements: JSON.parse(t.elementsJson) }));
+  app.get("/api/labels", async (req) => {
+    return req.pb.collection("label_templates").getFullList({ sort: "name" });
   });
 
   app.get("/api/labels/:id", async (req, reply) => {
     const { id } = req.params as { id: string };
-    const template = await db.labelTemplate.findUnique({ where: { id: Number(id) } });
-    if (!template) return reply.code(404).send({ error: "Template not found" });
-    return { ...template, elements: JSON.parse(template.elementsJson) };
+    try {
+      return await req.pb.collection("label_templates").getOne(id);
+    } catch {
+      return reply.code(404).send({ error: "Template not found" });
+    }
   });
 
   app.post("/api/labels", async (req, reply) => {
     const parsed = templateBody.safeParse(req.body);
     if (!parsed.success) return reply.code(400).send({ error: parsed.error.flatten() });
-    const { elements, ...rest } = parsed.data;
-    const template = await db.labelTemplate.create({
-      data: { ...rest, elementsJson: JSON.stringify(elements) },
-    });
-    return { ...template, elements };
+    return req.pb.collection("label_templates").create(parsed.data);
   });
 
   app.put("/api/labels/:id", async (req, reply) => {
     const { id } = req.params as { id: string };
     const parsed = templateBody.safeParse(req.body);
     if (!parsed.success) return reply.code(400).send({ error: parsed.error.flatten() });
-    const { elements, ...rest } = parsed.data;
-    const template = await db.labelTemplate.update({
-      where: { id: Number(id) },
-      data: { ...rest, elementsJson: JSON.stringify(elements) },
-    });
-    return { ...template, elements };
+    return req.pb.collection("label_templates").update(id, parsed.data);
   });
 
   app.delete("/api/labels/:id", async (req) => {
     const { id } = req.params as { id: string };
-    await db.labelTemplate.delete({ where: { id: Number(id) } });
+    await req.pb.collection("label_templates").delete(id);
     return { ok: true };
   });
 }

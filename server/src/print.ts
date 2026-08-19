@@ -15,10 +15,18 @@ export interface PrintResult {
 // pngBuffer must already be rendered at the printer's native resolution
 // (696px wide for 62mm continuous media at 300dpi) — see web's label
 // designer, which renders the same Konva stage used for editing.
-export async function printLabelPng(pngBuffer: Buffer, label = "62"): Promise<PrintResult> {
-  const printerHost = process.env.PRINTER_HOST;
+//
+// printerHost is the live value from the "settings" PocketBase collection
+// (Settings > Printer in the UI) — callers should pass that in. Falls back
+// to the PRINTER_HOST env var so a deployment keeps working before anyone's
+// visited Settings yet.
+export async function printLabelPng(
+  pngBuffer: Buffer,
+  label = "62",
+  printerHost = process.env.PRINTER_HOST,
+): Promise<PrintResult> {
   if (!printerHost) {
-    return { ok: false, message: "PRINTER_HOST is not set in server/.env" };
+    return { ok: false, message: "No printer configured — set one on the Settings > Printer page." };
   }
 
   const dir = await mkdtemp(path.join(tmpdir(), "rentmanplus-label-"));

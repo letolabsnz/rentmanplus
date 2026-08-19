@@ -9,7 +9,9 @@ export default function ProjectsList() {
   const { data, isLoading, error } = useQuery({
     queryKey: ["projects"],
     queryFn: api.listProjects,
-    refetchInterval: 60_000,
+    // See EquipmentList.tsx — matches the server's Rentman cache TTL rather
+    // than polling faster than that data can actually change.
+    refetchInterval: 5 * 60_000,
   });
 
   const filtered = useMemo(() => {

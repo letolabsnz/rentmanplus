@@ -1,12 +1,11 @@
 import type { FastifyInstance } from "fastify";
 import { z } from "zod";
-import { db } from "../db.js";
 import { printLabelPng } from "../print.js";
+import { logEvent } from "../log.js";
 
 const printBody = z.object({
-  templateId: z.number(),
+  templateId: z.string(),
   rentmanSerialNumberId: z.string(),
-  who: z.string().optional(),
   imageDataUrl: z.string().startsWith("data:image/png;base64,"),
   label: z.string(),
 });
@@ -15,13 +14,16 @@ export async function printRoutes(app: FastifyInstance) {
   app.post("/api/print", async (req, reply) => {
     const parsed = printBody.safeParse(req.body);
     if (!parsed.success) return reply.code(400).send({ error: parsed.error.flatten() });
-    const { templateId, rentmanSerialNumberId, who, imageDataUrl, label } = parsed.data;
+    const { templateId, rentmanSerialNumberId, imageDataUrl, label } = parsed.data;
 
+    const settings = await req.pb.collection("settings").getFirstListItem("").catch(() => null);
     const png = Buffer.from(imageDataUrl.slice("data:image/png;base64,".length), "base64");
-    const result = await printLabelPng(png, label);
+    const result = await printLabelPng(png, label, settings?.printerHost || undefined);
 
     if (result.ok) {
-      await db.printJob.create({ data: { templateId, rentmanSerialNumberId, who } });
+      // "who" is the logged-in account, not client input — see auth.ts.
+      const who = req.user.name || req.user.email;
+      await logEvent(req.pb, "print", who, { template: templateId, rentmanSerialNumberId });
     }
 
     return reply.code(result.ok ? 200 : 502).send(result);
