@@ -61,9 +61,11 @@ function AppShell() {
               Logs
             </NavLink>
           )}
-          <NavLink to="/settings" className={navClass}>
-            Settings
-          </NavLink>
+          {record?.isAdmin === true && (
+            <NavLink to="/settings" className={navClass}>
+              Settings
+            </NavLink>
+          )}
         </nav>
         <span className="text-sm text-neutral-500">{record?.name || record?.email}</span>
         <button
@@ -89,8 +91,22 @@ function AppShell() {
               </RequireAdmin>
             }
           />
-          <Route path="/labels/:id" element={<LabelEditor />} />
-          <Route path="/settings/*" element={<SettingsPage />} />
+          <Route
+            path="/labels/:id"
+            element={
+              <RequireAdmin>
+                <LabelEditor />
+              </RequireAdmin>
+            }
+          />
+          <Route
+            path="/settings/*"
+            element={
+              <RequireAdmin>
+                <SettingsPage />
+              </RequireAdmin>
+            }
+          />
         </Routes>
       </main>
     </div>

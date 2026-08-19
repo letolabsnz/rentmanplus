@@ -1,4 +1,4 @@
-import { NavLink, Route, Routes } from "react-router-dom";
+import { Navigate, NavLink, Route, Routes } from "react-router-dom";
 import LabelsList from "./LabelsList";
 import PrinterSettings from "../components/PrinterSettings";
 import GeneralSettings from "../components/GeneralSettings";
@@ -25,7 +25,7 @@ export default function SettingsPage() {
         </NavLink>
       </nav>
       <Routes>
-        <Route index element={<GeneralSettings />} />
+        <Route index element={<Navigate to="general" replace />} />
         <Route path="general" element={<GeneralSettings />} />
         <Route path="labels" element={<LabelsList />} />
         <Route path="printer" element={<PrinterSettings />} />

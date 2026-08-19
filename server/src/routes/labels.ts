@@ -1,6 +1,7 @@
 import type { FastifyInstance } from "fastify";
 import { z } from "zod";
 import { logEvent } from "../log.js";
+import { requireAdmin } from "../auth.js";
 
 const elementSchema = z.object({
   id: z.string(),
@@ -31,6 +32,10 @@ const templateBody = z.object({
 });
 
 export async function labelRoutes(app: FastifyInstance) {
+  // GET stays open to every authenticated user — printing (any crew member)
+  // needs to list/read templates. Creating/editing/deleting is admin-only,
+  // same as the Settings > Label templates page that's the only way to
+  // reach those actions.
   app.get("/api/labels", async (req) => {
     return req.pb.collection("label_templates").getFullList({ sort: "name" });
   });
@@ -44,7 +49,7 @@ export async function labelRoutes(app: FastifyInstance) {
     }
   });
 
-  app.post("/api/labels", async (req, reply) => {
+  app.post("/api/labels", { preHandler: requireAdmin }, async (req, reply) => {
     const parsed = templateBody.safeParse(req.body);
     if (!parsed.success) return reply.code(400).send({ error: parsed.error.flatten() });
     const created = await req.pb.collection("label_templates").create(parsed.data);
@@ -53,7 +58,7 @@ export async function labelRoutes(app: FastifyInstance) {
     return created;
   });
 
-  app.put("/api/labels/:id", async (req, reply) => {
+  app.put("/api/labels/:id", { preHandler: requireAdmin }, async (req, reply) => {
     const { id } = req.params as { id: string };
     const parsed = templateBody.safeParse(req.body);
     if (!parsed.success) return reply.code(400).send({ error: parsed.error.flatten() });
@@ -63,7 +68,7 @@ export async function labelRoutes(app: FastifyInstance) {
     return updated;
   });
 
-  app.delete("/api/labels/:id", async (req) => {
+  app.delete("/api/labels/:id", { preHandler: requireAdmin }, async (req) => {
     const { id } = req.params as { id: string };
     // Fetched before deleting purely so the log entry can name the
     // template — it's gone from label_templates after this either way.
