@@ -3,6 +3,7 @@ import { Link, useParams } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import { api } from "../lib/api";
 import BatchPrintBar from "../components/BatchPrintBar";
+import RefreshButton from "../components/RefreshButton";
 
 export default function EquipmentDetail() {
   const { id = "" } = useParams();
@@ -54,20 +55,23 @@ export default function EquipmentDetail() {
           )}
 
           <section className="border border-neutral-800 rounded-lg overflow-hidden">
-            <div className="flex items-center gap-3 px-4 pt-3 pb-1">
-              {equipment.serialNumbers.length > 0 && (
-                <input
-                  type="checkbox"
-                  checked={selected.size === equipment.serialNumbers.length}
-                  ref={(el) => {
-                    if (el) el.indeterminate = selected.size > 0 && selected.size < equipment.serialNumbers.length;
-                  }}
-                  onChange={toggleAll}
-                />
-              )}
-              <h2 className="text-sm font-semibold text-neutral-400">
-                Serial numbers ({equipment.serialNumbers.length})
-              </h2>
+            <div className="flex items-center justify-between gap-3 px-4 pt-3 pb-1">
+              <div className="flex items-center gap-3">
+                {equipment.serialNumbers.length > 0 && (
+                  <input
+                    type="checkbox"
+                    checked={selected.size === equipment.serialNumbers.length}
+                    ref={(el) => {
+                      if (el) el.indeterminate = selected.size > 0 && selected.size < equipment.serialNumbers.length;
+                    }}
+                    onChange={toggleAll}
+                  />
+                )}
+                <h2 className="text-sm font-semibold text-neutral-400">
+                  Serial numbers ({equipment.serialNumbers.length})
+                </h2>
+              </div>
+              <RefreshButton queryKeys={[["equipment", id]]} />
             </div>
             <div className="divide-y divide-neutral-800">
               {equipment.serialNumbers.map((sn) => (
