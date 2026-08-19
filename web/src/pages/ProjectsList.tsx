@@ -1,0 +1,58 @@
+import { useState, useMemo } from "react";
+import { Link } from "react-router-dom";
+import { useQuery } from "@tanstack/react-query";
+import { api, pick, type RentmanRecord } from "../lib/api";
+
+export default function ProjectsList() {
+  const [search, setSearch] = useState("");
+  const { data, isLoading, error } = useQuery({
+    queryKey: ["projects"],
+    queryFn: api.listProjects,
+  });
+
+  const filtered = useMemo(() => {
+    const projects = data?.data ?? [];
+    if (!search.trim()) return projects;
+    const term = search.toLowerCase();
+    return projects.filter((p) => JSON.stringify(p).toLowerCase().includes(term));
+  }, [data, search]);
+
+  return (
+    <div className="max-w-4xl mx-auto flex flex-col gap-4">
+      <div className="flex items-center justify-between">
+        <h1 className="text-xl font-semibold">Projects</h1>
+        <input
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+          placeholder="Search projects…"
+          className="bg-neutral-900 border border-neutral-800 rounded-md px-3 py-1.5 text-sm w-72 focus:outline-none focus:border-neutral-600"
+        />
+      </div>
+
+      {isLoading && <p className="text-neutral-500 text-sm">Loading…</p>}
+      {error && (
+        <p className="text-red-400 text-sm">
+          Couldn't load projects: {(error as Error).message}. Check RENTMAN_API_TOKEN in server/.env.
+        </p>
+      )}
+
+      <div className="border border-neutral-800 rounded-lg divide-y divide-neutral-800 overflow-hidden">
+        {filtered.map((project: RentmanRecord) => (
+          <Link
+            key={project.id}
+            to={`/projects/${project.id}`}
+            className="flex items-center justify-between px-4 py-3 hover:bg-neutral-900 text-sm"
+          >
+            <span className="font-medium">{pick(project, "name", "displayname", "title")}</span>
+            <span className="text-neutral-500 text-xs">
+              {pick(project, "planperiod_start", "startdate", "date_from")}
+            </span>
+          </Link>
+        ))}
+        {!isLoading && filtered.length === 0 && (
+          <p className="px-4 py-6 text-neutral-500 text-sm">No projects found.</p>
+        )}
+      </div>
+    </div>
+  );
+}

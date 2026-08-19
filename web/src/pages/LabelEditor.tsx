@@ -1,0 +1,543 @@
+import { useEffect, useRef, useState } from "react";
+import { useNavigate, useParams, Link } from "react-router-dom";
+import { api } from "../lib/api";
+import { renderLabelToCanvas } from "../lib/renderLabel";
+import { trimWhitespace } from "../lib/imageTrim";
+import {
+  applyFolderLevels,
+  DATA_FIELDS,
+  SAMPLE_CONTEXT,
+  SIZE_PRESETS,
+  TAPE_WIDTHS,
+  type DataFieldKey,
+  type ElementType,
+  type LabelElement,
+} from "../lib/labelSpec";
+
+const EDITOR_SCALE = 6; // px per mm on screen — print export uses the printer's real dots-per-mm instead
+
+function newElement(type: Exclude<ElementType, "image">): LabelElement {
+  const base = { id: crypto.randomUUID(), x: 2, y: 2 };
+  switch (type) {
+    case "text":
+      return { ...base, type, width: 30, height: 6, dataField: "displayname", fontSize: 4 };
+    case "staticText":
+      return { ...base, type, width: 20, height: 6, text: "Label", fontSize: 4 };
+    case "qr":
+      return { ...base, type, width: 14, height: 14, dataField: "qrcodes", lockAspect: true };
+    case "barcode":
+      return { ...base, type, width: 32, height: 10, dataField: "qrcodes" };
+  }
+}
+
+type DragMode = "move" | "resize";
+interface DragState {
+  id: string;
+  mode: DragMode;
+  startX: number;
+  startY: number;
+  orig: LabelElement;
+}
+
+export default function LabelEditor() {
+  const { id } = useParams();
+  const isNew = id === "new";
+  const navigate = useNavigate();
+
+  const [name, setName] = useState("New template");
+  const [widthMm, setWidthMm] = useState(62);
+  const [heightMm, setHeightMm] = useState(29);
+  const [elements, setElements] = useState<LabelElement[]>([]);
+  const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [saving, setSaving] = useState(false);
+
+  useEffect(() => {
+    if (isNew || !id) return;
+    api.getLabel(Number(id)).then((t) => {
+      setName(t.name);
+      setWidthMm(t.widthMm);
+      setHeightMm(t.heightMm);
+      setElements(t.elements);
+    });
+  }, [id, isNew]);
+
+  const canvasRef = useRef<HTMLCanvasElement>(null);
+  useEffect(() => {
+    let cancelled = false;
+    renderLabelToCanvas({ widthMm, heightMm, elements }, SAMPLE_CONTEXT, EDITOR_SCALE).then((rendered) => {
+      const canvas = canvasRef.current;
+      if (!canvas || cancelled) return;
+      canvas.width = rendered.width;
+      canvas.height = rendered.height;
+      canvas.getContext("2d")?.drawImage(rendered, 0, 0);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [widthMm, heightMm, elements]);
+
+  const dragRef = useRef<DragState | null>(null);
+  const addImageInputRef = useRef<HTMLInputElement>(null);
+  const replaceImageInputRef = useRef<HTMLInputElement>(null);
+
+  function onHandlePointerDown(e: React.PointerEvent, el: LabelElement, mode: DragMode) {
+    e.stopPropagation();
+    setSelectedId(el.id);
+    dragRef.current = { id: el.id, mode, startX: e.clientX, startY: e.clientY, orig: el };
+    window.addEventListener("pointermove", onPointerMove);
+    window.addEventListener("pointerup", onPointerUp);
+  }
+
+  function onPointerMove(e: PointerEvent) {
+    const drag = dragRef.current;
+    if (!drag) return;
+    const dxMm = (e.clientX - drag.startX) / EDITOR_SCALE;
+    const dyMm = (e.clientY - drag.startY) / EDITOR_SCALE;
+    setElements((prev) =>
+      prev.map((el) => {
+        if (el.id !== drag.id) return el;
+        if (drag.mode === "move") {
+          // No clamp to 0 — elements (a logo, a background block) can be
+          // dragged partially or fully off any edge for a bleed effect.
+          return { ...el, x: Math.round(drag.orig.x + dxMm), y: Math.round(drag.orig.y + dyMm) };
+        }
+        const width = Math.max(2, Math.round(drag.orig.width + dxMm));
+        const height = Math.max(2, Math.round(drag.orig.height + dyMm));
+        if (!el.lockAspect) return { ...el, width, height };
+
+        // Keep the element's original width:height ratio — driven by
+        // whichever axis the pointer moved further along.
+        const ratio = drag.orig.width / drag.orig.height;
+        return Math.abs(dxMm) >= Math.abs(dyMm)
+          ? { ...el, width, height: Math.max(2, Math.round(width / ratio)) }
+          : { ...el, width: Math.max(2, Math.round(height * ratio)), height };
+      }),
+    );
+  }
+
+  function onPointerUp() {
+    dragRef.current = null;
+    window.removeEventListener("pointermove", onPointerMove);
+    window.removeEventListener("pointerup", onPointerUp);
+  }
+
+  function updateSelected(patch: Partial<LabelElement>) {
+    setElements((prev) => prev.map((el) => (el.id === selectedId ? { ...el, ...patch } : el)));
+  }
+
+  function addElement(type: Exclude<ElementType, "image">) {
+    const el = newElement(type);
+    setElements((prev) => [...prev, el]);
+    setSelectedId(el.id);
+  }
+
+  async function readImageFile(file: File): Promise<{ dataUrl: string; naturalWidth: number; naturalHeight: number }> {
+    const rawDataUrl = await new Promise<string>((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onerror = () => reject(new Error("Could not read file"));
+      reader.onload = () => resolve(reader.result as string);
+      reader.readAsDataURL(file);
+    });
+    // Logos frequently export with transparent/white padding baked in —
+    // trim that off so what you place on the label is just the mark.
+    const dataUrl = await trimWhitespace(rawDataUrl);
+    const { naturalWidth, naturalHeight } = await new Promise<{ naturalWidth: number; naturalHeight: number }>(
+      (resolve, reject) => {
+        const img = new Image();
+        img.onload = () => resolve({ naturalWidth: img.naturalWidth, naturalHeight: img.naturalHeight });
+        img.onerror = () => reject(new Error("Could not decode image"));
+        img.src = dataUrl;
+      },
+    );
+    return { dataUrl, naturalWidth, naturalHeight };
+  }
+
+  async function addImageElement(file: File) {
+    const { dataUrl, naturalWidth, naturalHeight } = await readImageFile(file);
+    const width = 20;
+    const height = Math.max(2, Math.round((width * naturalHeight) / naturalWidth));
+    const el: LabelElement = {
+      id: crypto.randomUUID(),
+      type: "image",
+      x: 2,
+      y: 2,
+      width,
+      height,
+      imageData: dataUrl,
+      lockAspect: true,
+    };
+    setElements((prev) => [...prev, el]);
+    setSelectedId(el.id);
+  }
+
+  async function replaceSelectedImage(file: File) {
+    const { dataUrl } = await readImageFile(file);
+    updateSelected({ imageData: dataUrl });
+  }
+
+  function deleteSelected() {
+    setElements((prev) => prev.filter((el) => el.id !== selectedId));
+    setSelectedId(null);
+  }
+
+  async function save() {
+    setSaving(true);
+    try {
+      const template = { name, widthMm, heightMm, elements };
+      if (isNew) {
+        const created = await api.createLabel(template);
+        navigate(`/labels/${created.id}`, { replace: true });
+      } else {
+        await api.updateLabel(Number(id), template);
+      }
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  const selected = elements.find((el) => el.id === selectedId) ?? null;
+
+  return (
+    <div className="max-w-5xl mx-auto flex flex-col gap-4">
+      <Link to="/labels" className="text-sm text-neutral-500 hover:text-white w-fit">
+        ← Labels
+      </Link>
+
+      <div className="flex items-center justify-between">
+        <input
+          value={name}
+          onChange={(e) => setName(e.target.value)}
+          className="bg-transparent text-xl font-semibold focus:outline-none border-b border-transparent focus:border-neutral-700"
+        />
+        <button
+          onClick={save}
+          disabled={saving}
+          className="text-sm px-4 py-1.5 rounded-md bg-white text-black font-medium hover:bg-neutral-200 disabled:opacity-50"
+        >
+          {saving ? "Saving…" : "Save template"}
+        </button>
+      </div>
+
+      <div className="flex flex-wrap items-center gap-4 border border-neutral-800 rounded-lg p-3 text-sm">
+        <div className="flex items-center gap-2">
+          <span className="text-neutral-500">Preset</span>
+          {SIZE_PRESETS.map((p) => (
+            <button
+              key={p.name}
+              onClick={() => {
+                setWidthMm(p.widthMm);
+                setHeightMm(p.heightMm);
+              }}
+              className="px-2 py-1 rounded border border-neutral-800 hover:bg-neutral-900"
+            >
+              {p.name}
+            </button>
+          ))}
+        </div>
+        <div className="flex items-center gap-2">
+          <span className="text-neutral-500">Tape width</span>
+          <select
+            value={widthMm}
+            onChange={(e) => setWidthMm(Number(e.target.value))}
+            className="bg-neutral-900 border border-neutral-800 rounded px-2 py-1"
+          >
+            {TAPE_WIDTHS.map((w) => (
+              <option key={w.mm} value={w.mm}>
+                {w.mm}mm
+              </option>
+            ))}
+          </select>
+        </div>
+        <div className="flex items-center gap-2">
+          <span className="text-neutral-500">Length</span>
+          <input
+            type="number"
+            min={5}
+            value={heightMm}
+            onChange={(e) => setHeightMm(Number(e.target.value))}
+            className="bg-neutral-900 border border-neutral-800 rounded px-2 py-1 w-20"
+          />
+          <span className="text-neutral-500">mm</span>
+        </div>
+        <div className="flex items-center gap-2 ml-auto">
+          <span className="text-neutral-500">Add</span>
+          <button onClick={() => addElement("text")} className="px-2 py-1 rounded border border-neutral-800 hover:bg-neutral-900">
+            Text
+          </button>
+          <button onClick={() => addElement("staticText")} className="px-2 py-1 rounded border border-neutral-800 hover:bg-neutral-900">
+            Static text
+          </button>
+          <button onClick={() => addElement("barcode")} className="px-2 py-1 rounded border border-neutral-800 hover:bg-neutral-900">
+            Barcode
+          </button>
+          <button onClick={() => addElement("qr")} className="px-2 py-1 rounded border border-neutral-800 hover:bg-neutral-900">
+            QR
+          </button>
+          <button
+            onClick={() => addImageInputRef.current?.click()}
+            className="px-2 py-1 rounded border border-neutral-800 hover:bg-neutral-900"
+          >
+            Image
+          </button>
+          <input
+            ref={addImageInputRef}
+            type="file"
+            accept="image/*"
+            className="hidden"
+            onChange={(e) => {
+              const file = e.target.files?.[0];
+              if (file) addImageElement(file);
+              e.target.value = "";
+            }}
+          />
+        </div>
+      </div>
+
+      <div className="flex gap-4 items-start">
+        {/* Padded workspace so elements can be dragged past the label's edges
+            (e.g. a full-bleed logo) without running out of room to grab them. */}
+        <div className="border border-dashed border-neutral-800 shrink-0" style={{ padding: 60 }}>
+          <div
+            className="relative bg-white"
+            style={{ width: widthMm * EDITOR_SCALE, height: heightMm * EDITOR_SCALE }}
+            onPointerDown={() => setSelectedId(null)}
+          >
+            <canvas ref={canvasRef} className="absolute inset-0 pointer-events-none" />
+            {elements.map((el) => (
+              <div
+                key={el.id}
+                onPointerDown={(e) => onHandlePointerDown(e, el, "move")}
+                className={`absolute border cursor-move ${
+                  el.id === selectedId ? "border-blue-500" : "border-transparent hover:border-blue-500/40"
+                }`}
+                style={{
+                  left: el.x * EDITOR_SCALE,
+                  top: el.y * EDITOR_SCALE,
+                  width: el.width * EDITOR_SCALE,
+                  height: el.height * EDITOR_SCALE,
+                }}
+              >
+                {el.id === selectedId && (
+                  <div
+                    onPointerDown={(e) => onHandlePointerDown(e, el, "resize")}
+                    className="absolute -right-1.5 -bottom-1.5 w-3 h-3 bg-blue-500 rounded-sm cursor-nwse-resize"
+                  />
+                )}
+              </div>
+            ))}
+          </div>
+        </div>
+
+        <div className="flex-1 border border-neutral-800 rounded-lg p-4 text-sm min-w-64">
+          {!selected ? (
+            <p className="text-neutral-500">Select an element to edit it, or add one above. Drag to move, drag the corner to resize.</p>
+          ) : (
+            <div className="flex flex-col gap-3">
+              <h3 className="font-semibold text-neutral-300 capitalize">{selected.type}</h3>
+
+              {(selected.type === "text" || selected.type === "barcode" || selected.type === "qr") && (
+                <label className="flex flex-col gap-1">
+                  <span className="text-neutral-500">Data field</span>
+                  <select
+                    value={selected.dataField}
+                    onChange={(e) => updateSelected({ dataField: e.target.value as DataFieldKey })}
+                    className="bg-neutral-900 border border-neutral-800 rounded px-2 py-1"
+                  >
+                    {DATA_FIELDS.map((f) => (
+                      <option key={f.key} value={f.key}>
+                        {f.label}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+              )}
+
+              {selected.dataField === "equipmentFolder" &&
+                (selected.type === "text" || selected.type === "barcode" || selected.type === "qr") && (
+                  <div className="flex flex-col gap-1">
+                    <span className="text-neutral-500">Folder levels</span>
+                    <div className="flex gap-1 flex-wrap">
+                      {[1, 2, 3, 4, 5].map((level) => {
+                        const active = (selected.folderLevels ?? []).includes(level);
+                        return (
+                          <button
+                            key={level}
+                            onClick={() => {
+                              const current = selected.folderLevels ?? [];
+                              const next = active ? current.filter((l) => l !== level) : [...current, level];
+                              updateSelected({ folderLevels: next });
+                            }}
+                            className={`w-8 h-8 rounded border ${
+                              active
+                                ? "border-blue-500 text-white"
+                                : "border-neutral-800 text-neutral-500 hover:bg-neutral-900"
+                            }`}
+                          >
+                            {level}
+                          </button>
+                        );
+                      })}
+                      <button
+                        onClick={() => updateSelected({ folderLevels: [] })}
+                        className={`px-2 h-8 rounded border ${
+                          (selected.folderLevels ?? []).length === 0
+                            ? "border-blue-500 text-white"
+                            : "border-neutral-800 text-neutral-500 hover:bg-neutral-900"
+                        }`}
+                      >
+                        All
+                      </button>
+                    </div>
+                    <span className="text-xs text-neutral-600">
+                      e.g. "{applyFolderLevels(SAMPLE_CONTEXT.equipmentFolder, selected.folderLevels) || "(empty)"}"
+                      for {SAMPLE_CONTEXT.equipmentFolder}
+                    </span>
+                  </div>
+                )}
+
+              {(selected.type === "barcode" || selected.type === "qr" || selected.type === "image") && (
+                <label className="flex items-center gap-2">
+                  <input
+                    type="checkbox"
+                    checked={selected.lockAspect ?? false}
+                    onChange={(e) => updateSelected({ lockAspect: e.target.checked })}
+                  />
+                  <span className="text-neutral-500">
+                    Lock aspect ratio{selected.type === "qr" ? " (recommended — keeps the QR scannable)" : ""}
+                  </span>
+                </label>
+              )}
+
+              {selected.type === "image" && (
+                <div className="flex flex-col gap-2">
+                  {selected.imageData && (
+                    <img src={selected.imageData} alt="" className="max-h-24 max-w-full object-contain border border-neutral-800 rounded bg-white" />
+                  )}
+                  <button
+                    onClick={() => replaceImageInputRef.current?.click()}
+                    className="px-2 py-1 rounded border border-neutral-800 hover:bg-neutral-900 w-fit"
+                  >
+                    Replace image
+                  </button>
+                  <input
+                    ref={replaceImageInputRef}
+                    type="file"
+                    accept="image/*"
+                    className="hidden"
+                    onChange={(e) => {
+                      const file = e.target.files?.[0];
+                      if (file) replaceSelectedImage(file);
+                      e.target.value = "";
+                    }}
+                  />
+                </div>
+              )}
+
+              {selected.type === "staticText" && (
+                <label className="flex flex-col gap-1">
+                  <span className="text-neutral-500">Text</span>
+                  <input
+                    value={selected.text ?? ""}
+                    onChange={(e) => updateSelected({ text: e.target.value })}
+                    className="bg-neutral-900 border border-neutral-800 rounded px-2 py-1"
+                  />
+                </label>
+              )}
+
+              {(selected.type === "text" || selected.type === "staticText") && (
+                <>
+                  <label className="flex flex-col gap-1">
+                    <span className="text-neutral-500">Font size (mm)</span>
+                    <input
+                      type="number"
+                      min={1}
+                      value={selected.fontSize ?? 4}
+                      onChange={(e) => updateSelected({ fontSize: Number(e.target.value) })}
+                      className="bg-neutral-900 border border-neutral-800 rounded px-2 py-1"
+                    />
+                  </label>
+                  <label className="flex flex-col gap-1">
+                    <span className="text-neutral-500">Padding (mm)</span>
+                    <input
+                      type="number"
+                      min={0}
+                      value={selected.padding ?? 0}
+                      onChange={(e) => updateSelected({ padding: Number(e.target.value) })}
+                      className="bg-neutral-900 border border-neutral-800 rounded px-2 py-1"
+                    />
+                  </label>
+                  <label className="flex items-center gap-2">
+                    <input
+                      type="checkbox"
+                      checked={selected.bold ?? false}
+                      onChange={(e) => updateSelected({ bold: e.target.checked })}
+                    />
+                    <span className="text-neutral-500">Bold</span>
+                  </label>
+
+                  <label className="flex flex-col gap-1">
+                    <span className="text-neutral-500">Align</span>
+                    <div className="flex gap-1">
+                      {(["left", "center", "right"] as const).map((a) => (
+                        <button
+                          key={a}
+                          onClick={() => updateSelected({ align: a })}
+                          className={`flex-1 px-2 py-1 rounded border capitalize ${
+                            (selected.align ?? "left") === a
+                              ? "border-blue-500 text-white"
+                              : "border-neutral-800 text-neutral-500 hover:bg-neutral-900"
+                          }`}
+                        >
+                          {a}
+                        </button>
+                      ))}
+                    </div>
+                  </label>
+
+                  <label className="flex flex-col gap-1">
+                    <span className="text-neutral-500">Vertical align</span>
+                    <div className="flex gap-1">
+                      {(["top", "middle", "bottom"] as const).map((v) => (
+                        <button
+                          key={v}
+                          onClick={() => updateSelected({ valign: v })}
+                          className={`flex-1 px-2 py-1 rounded border capitalize ${
+                            (selected.valign ?? "top") === v
+                              ? "border-blue-500 text-white"
+                              : "border-neutral-800 text-neutral-500 hover:bg-neutral-900"
+                          }`}
+                        >
+                          {v}
+                        </button>
+                      ))}
+                    </div>
+                  </label>
+
+                  <label className="flex items-center gap-2">
+                    <input
+                      type="checkbox"
+                      checked={selected.wrap ?? false}
+                      onChange={(e) => updateSelected({ wrap: e.target.checked })}
+                    />
+                    <span className="text-neutral-500">Wrap text (instead of squeezing onto one line)</span>
+                  </label>
+                </>
+              )}
+
+              <div className="grid grid-cols-2 gap-2 text-xs text-neutral-500">
+                <span>x: {selected.x}mm</span>
+                <span>y: {selected.y}mm</span>
+                <span>w: {selected.width}mm</span>
+                <span>h: {selected.height}mm</span>
+              </div>
+
+              <button onClick={deleteSelected} className="text-red-400 text-left hover:text-red-300 mt-2">
+                Delete element
+              </button>
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
