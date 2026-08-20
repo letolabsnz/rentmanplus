@@ -1,5 +1,6 @@
 import { Navigate, NavLink, Route, Routes } from "react-router-dom";
 import LabelsList from "./LabelsList";
+import UsersPage from "./UsersPage";
 import PrinterSettings from "../components/PrinterSettings";
 import GeneralSettings from "../components/GeneralSettings";
 
@@ -23,12 +24,16 @@ export default function SettingsPage() {
         <NavLink to="/settings/printer" className={tabClass}>
           Printer
         </NavLink>
+        <NavLink to="/settings/users" className={tabClass}>
+          Users
+        </NavLink>
       </nav>
       <Routes>
         <Route index element={<Navigate to="general" replace />} />
         <Route path="general" element={<GeneralSettings />} />
         <Route path="labels" element={<LabelsList />} />
         <Route path="printer" element={<PrinterSettings />} />
+        <Route path="users" element={<UsersPage />} />
       </Routes>
     </div>
   );

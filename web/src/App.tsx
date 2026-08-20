@@ -10,6 +10,7 @@ import SettingsPage from "./pages/SettingsPage";
 import CustomLabelPage from "./pages/CustomLabelPage";
 import LogsPage from "./pages/LogsPage";
 import LabelEditor from "./pages/LabelEditor";
+import UserDetail from "./pages/UserDetail";
 import LoginPage from "./pages/LoginPage";
 import RequireAuth from "./components/RequireAuth";
 import RequireAdmin from "./components/RequireAdmin";
@@ -109,6 +110,14 @@ function AppShell() {
             element={
               <RequireAdmin>
                 <SettingsPage />
+              </RequireAdmin>
+            }
+          />
+          <Route
+            path="/users/:id"
+            element={
+              <RequireAdmin>
+                <UserDetail />
               </RequireAdmin>
             }
           />

@@ -99,7 +99,29 @@ export const api = {
   getLogs: () => request<LogEntry[]>("/api/logs"),
   logEvent: (type: string, details?: Record<string, unknown>) =>
     request<LogEntry>("/api/logs", { method: "POST", body: JSON.stringify({ type, details }) }),
+
+  listUsers: () => request<UserRecord[]>("/api/users"),
+  createUser: (data: { name: string; email: string; password: string; isAdmin?: boolean }) =>
+    request<UserRecord>("/api/users", { method: "POST", body: JSON.stringify(data) }),
+  updateUser: (id: string, data: Partial<{ name: string; email: string; isAdmin: boolean; password: string }>) =>
+    request<UserRecord>(`/api/users/${id}`, { method: "PUT", body: JSON.stringify(data) }),
+  deleteUser: (id: string) => request<{ ok: true }>(`/api/users/${id}`, { method: "DELETE" }),
+  getUserActivity: (id: string) => request<UserActivity>(`/api/users/${id}/activity`),
 };
+
+export interface UserActivity {
+  stats: { prints: number; logins: number; pageViews: number };
+  recent: LogEntry[];
+}
+
+export interface UserRecord {
+  id: string;
+  name: string;
+  email: string;
+  isAdmin: boolean;
+  verified: boolean;
+  created: string;
+}
 
 export interface Settings {
   printerHost: string;

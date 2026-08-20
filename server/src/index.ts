@@ -11,6 +11,7 @@ import { printRoutes } from "./routes/print.js";
 import { settingsRoutes } from "./routes/settings.js";
 import { statsRoutes } from "./routes/stats.js";
 import { logsRoutes } from "./routes/logs.js";
+import { usersRoutes } from "./routes/users.js";
 import { clearRentmanCache } from "./rentman/client.js";
 import { requireAuth } from "./auth.js";
 
@@ -32,6 +33,7 @@ await app.register(printRoutes);
 await app.register(settingsRoutes);
 await app.register(statsRoutes);
 await app.register(logsRoutes);
+await app.register(usersRoutes);
 
 // Manual escape hatch for the 60s Rentman cache — lets the UI force a
 // truly fresh read instead of waiting out the window.
