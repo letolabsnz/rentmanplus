@@ -4,6 +4,7 @@ import { Link } from "react-router-dom";
 import { api } from "../lib/api";
 import { printAsset, type PrintableAsset } from "../lib/print";
 import { useToast } from "./ToastProvider";
+import NumberInput from "./NumberInput";
 
 export default function BatchPrintBar({
   assets,
@@ -79,11 +80,10 @@ export default function BatchPrintBar({
 
       <label className="flex items-center gap-2 text-neutral-500">
         Copies each
-        <input
-          type="number"
+        <NumberInput
           min={1}
           value={copies}
-          onChange={(e) => setCopies(Math.max(1, Number(e.target.value)))}
+          onChange={setCopies}
           className="w-14 bg-neutral-900 border border-neutral-800 rounded px-2 py-1 text-white"
         />
       </label>

@@ -17,6 +17,7 @@ const elementSchema = z.object({
   align: z.enum(["left", "center", "right"]).optional(),
   valign: z.enum(["top", "middle", "bottom"]).optional(),
   wrap: z.boolean().optional(),
+  breakWords: z.boolean().optional(),
   padding: z.number().optional(),
   lockAspect: z.boolean().optional(),
   imageData: z.string().optional(), // data: URL, image only

@@ -54,10 +54,38 @@ export async function renderLabelToCanvas(
   return canvas;
 }
 
-// Greedy word wrap — breaks a single very-long word (no spaces) by
-// character instead of overflowing, since asset codes/serials sometimes
-// have no natural break point.
-export function wrapText(ctx: CanvasRenderingContext2D, text: string, maxWidth: number): string[] {
+// Rotates a whole rendered canvas 90°/270° (swapping its width/height) —
+// used for the custom "big text" label's rotate option. Simpler and safer
+// than trying to rotate text layout in place: the source canvas is rendered
+// normally at swapped dimensions (so word-wrap sees the right width), then
+// the finished image is rotated as a single unit into the label's actual
+// physical width/height.
+export function rotateCanvas90(source: HTMLCanvasElement): HTMLCanvasElement {
+  const rotated = document.createElement("canvas");
+  rotated.width = source.height;
+  rotated.height = source.width;
+  const ctx = rotated.getContext("2d", { willReadFrequently: true });
+  if (!ctx) return rotated;
+  ctx.translate(rotated.width / 2, rotated.height / 2);
+  ctx.rotate(Math.PI / 2);
+  ctx.drawImage(source, -source.width / 2, -source.height / 2);
+  return rotated;
+}
+
+// Greedy word wrap. breakWords=true (the default, and old behavior)
+// force-splits a single very-long word (no spaces) by character instead of
+// overflowing, since asset codes/serials sometimes have no natural break
+// point — but applied to a normal word that just doesn't fit at the chosen
+// font size, that's what produces an ugly mid-word break like "Blackmagic
+// Design" -> "Blackmagic Desi" / "gn". breakWords=false leaves such a word
+// as its own (over-length) line instead; fillText's maxWidth then condenses
+// it to fit rather than cutting it.
+export function wrapText(
+  ctx: CanvasRenderingContext2D,
+  text: string,
+  maxWidth: number,
+  breakWords = true,
+): string[] {
   const lines: string[] = [];
   for (const paragraph of text.split("\n")) {
     let current = "";
@@ -71,7 +99,7 @@ export function wrapText(ctx: CanvasRenderingContext2D, text: string, maxWidth: 
         lines.push(current);
         current = "";
       }
-      if (ctx.measureText(word).width <= maxWidth) {
+      if (ctx.measureText(word).width <= maxWidth || !breakWords) {
         current = word;
         continue;
       }
@@ -152,7 +180,7 @@ async function drawElementContent(
     let lines: string[];
     if (el.wrap) {
       const maxLines = Math.max(1, Math.floor(innerH / lineHeight));
-      lines = wrapText(ctx, value, innerW).slice(0, maxLines);
+      lines = wrapText(ctx, value, innerW, el.breakWords ?? true).slice(0, maxLines);
     } else {
       lines = [value]; // single line — fillText's maxWidth below squishes it to fit instead of wrapping
     }

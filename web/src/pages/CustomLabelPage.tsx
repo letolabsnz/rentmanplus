@@ -1,7 +1,7 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { renderLabelToCanvas } from "../lib/renderLabel";
-import { buildCustomTextTemplate } from "../lib/customLabel";
+import { renderCustomTextCanvas } from "../lib/customLabel";
 import { printCustomText, printWithManualData } from "../lib/print";
 import {
   DATA_FIELDS,
@@ -13,6 +13,7 @@ import {
   type LabelTemplateData,
 } from "../lib/labelSpec";
 import { useToast } from "../components/ToastProvider";
+import NumberInput from "../components/NumberInput";
 import { api } from "../lib/api";
 
 const PREVIEW_SCALE = 6; // px per mm — matches LabelEditor's on-screen scale
@@ -25,15 +26,36 @@ function tabClass(active: boolean) {
   }`;
 }
 
+// Prints the same rendered PNG `copies` times, sequentially (the printer
+// processes one job at a time), and reports a single summary toast.
+async function printCopies(
+  copies: number,
+  print: () => Promise<{ ok: boolean; message: string }>,
+  showToast: (type: "success" | "error", message: string) => void,
+) {
+  let failed = 0;
+  let lastError = "";
+  for (let i = 0; i < copies; i++) {
+    const result = await print();
+    if (!result.ok) {
+      failed++;
+      lastError = result.message;
+    }
+  }
+  const ok = copies - failed;
+  if (failed === 0) {
+    showToast("success", `Printed ${ok} label${ok === 1 ? "" : "s"}`);
+  } else {
+    showToast("error", `Printed ${ok}/${copies}, ${failed} failed: ${lastError}`);
+  }
+}
+
 export default function CustomLabelPage() {
   const [mode, setMode] = useState<Mode>("text");
 
   return (
     <div className="max-w-2xl mx-auto flex flex-col gap-4">
-      <div>
-        <h1 className="text-xl font-semibold">Custom label</h1>
-        <p className="text-neutral-500 text-sm">Print a label that isn't tied to any Rentman asset.</p>
-      </div>
+      <h1 className="text-xl font-semibold">Custom label</h1>
 
       <div className="flex items-center gap-1 border border-neutral-800 rounded-md p-0.5 w-fit">
         <button className={tabClass(mode === "text")} onClick={() => setMode("text")}>
@@ -53,36 +75,33 @@ function BigTextMode() {
   const [text, setText] = useState("");
   const [widthMm, setWidthMm] = useState(62);
   const [heightMm, setHeightMm] = useState(29);
+  const [rotate90, setRotate90] = useState(false);
+  const [copies, setCopies] = useState(1);
   const [printing, setPrinting] = useState(false);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const { showToast } = useToast();
 
   useEffect(() => {
     let cancelled = false;
-    const template = buildCustomTextTemplate(text || "Sample text", widthMm, heightMm);
-    renderLabelToCanvas(template, SAMPLE_CONTEXT, PREVIEW_SCALE).then((rendered) => {
-      const canvas = canvasRef.current;
-      if (!canvas || cancelled) return;
-      canvas.width = rendered.width;
-      canvas.height = rendered.height;
-      canvas.getContext("2d")?.drawImage(rendered, 0, 0);
-    });
+    renderCustomTextCanvas(text || "Sample text", widthMm, heightMm, PREVIEW_SCALE, rotate90, SAMPLE_CONTEXT).then(
+      (rendered) => {
+        const canvas = canvasRef.current;
+        if (!canvas || cancelled) return;
+        canvas.width = rendered.width;
+        canvas.height = rendered.height;
+        canvas.getContext("2d")?.drawImage(rendered, 0, 0);
+      },
+    );
     return () => {
       cancelled = true;
     };
-  }, [text, widthMm, heightMm]);
+  }, [text, widthMm, heightMm, rotate90]);
 
   async function print() {
     if (!text.trim()) return;
     setPrinting(true);
     try {
-      const template = buildCustomTextTemplate(text, widthMm, heightMm);
-      const result = await printCustomText(text, template);
-      if (result.ok) {
-        showToast("success", "Printed");
-      } else {
-        showToast("error", `Print failed: ${result.message}`);
-      }
+      await printCopies(copies, () => printCustomText(text, widthMm, heightMm, rotate90), showToast);
     } catch (err) {
       showToast("error", `Print failed: ${(err as Error).message}`);
     } finally {
@@ -92,10 +111,6 @@ function BigTextMode() {
 
   return (
     <div className="flex flex-col gap-4">
-      <p className="text-neutral-500 text-sm -mt-2">
-        Type anything and it's sized as large as will fit — good for cases, shelves, or areas.
-      </p>
-
       <div className="flex flex-col gap-1">
         <label htmlFor="customText" className="text-sm text-neutral-400">
           Label text
@@ -110,19 +125,35 @@ function BigTextMode() {
         />
       </div>
 
-      <SizePicker widthMm={widthMm} heightMm={heightMm} onWidth={setWidthMm} onHeight={setHeightMm} />
+      <SizePicker widthMm={widthMm} heightMm={heightMm} onWidth={setWidthMm} onHeight={setHeightMm}>
+        <label className="flex items-center gap-2">
+          <input type="checkbox" checked={rotate90} onChange={(e) => setRotate90(e.target.checked)} />
+          <span className="text-neutral-500">Rotate 90°</span>
+        </label>
+      </SizePicker>
 
       <div className="flex items-center justify-center border border-neutral-800 rounded-lg p-6 bg-neutral-950 overflow-auto">
         <canvas ref={canvasRef} className="bg-white" />
       </div>
 
-      <button
-        onClick={print}
-        disabled={printing || !text.trim()}
-        className="text-sm px-4 py-2 rounded-md bg-white text-black font-medium hover:bg-neutral-200 disabled:opacity-50 w-fit self-end"
-      >
-        {printing ? "Printing…" : "Print"}
-      </button>
+      <div className="flex items-center justify-end gap-3">
+        <label className="flex items-center gap-2 text-sm text-neutral-500">
+          Copies
+          <NumberInput
+            min={1}
+            value={copies}
+            onChange={setCopies}
+            className="w-14 bg-neutral-900 border border-neutral-800 rounded px-2 py-1 text-white"
+          />
+        </label>
+        <button
+          onClick={print}
+          disabled={printing || !text.trim()}
+          className="text-sm px-4 py-2 rounded-md bg-white text-black font-medium hover:bg-neutral-200 disabled:opacity-50"
+        >
+          {printing ? "Printing…" : "Print"}
+        </button>
+      </div>
     </div>
   );
 }
@@ -141,6 +172,7 @@ function FromTemplateMode() {
   const { data: templates } = useQuery({ queryKey: ["labels"], queryFn: api.listLabels });
   const [templateId, setTemplateId] = useState("");
   const [fieldValues, setFieldValues] = useState<Partial<LabelDataContext>>({});
+  const [copies, setCopies] = useState(1);
   const [printing, setPrinting] = useState(false);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const { showToast } = useToast();
@@ -169,12 +201,7 @@ function FromTemplateMode() {
     if (!template) return;
     setPrinting(true);
     try {
-      const result = await printWithManualData(template, context);
-      if (result.ok) {
-        showToast("success", "Printed");
-      } else {
-        showToast("error", `Print failed: ${result.message}`);
-      }
+      await printCopies(copies, () => printWithManualData(template, context), showToast);
     } catch (err) {
       showToast("error", `Print failed: ${(err as Error).message}`);
     } finally {
@@ -184,10 +211,6 @@ function FromTemplateMode() {
 
   return (
     <div className="flex flex-col gap-4">
-      <p className="text-neutral-500 text-sm -mt-2">
-        Pick a template, type in the field values it needs, and print — no asset required.
-      </p>
-
       <div className="flex flex-col gap-1">
         <label htmlFor="template" className="text-sm text-neutral-400">
           Template
@@ -212,11 +235,7 @@ function FromTemplateMode() {
 
       {template && (
         <>
-          {fields.length === 0 ? (
-            <p className="text-neutral-500 text-sm">
-              This template has no asset-data fields — it'll print exactly as designed.
-            </p>
-          ) : (
+          {fields.length > 0 && (
             <div className="flex flex-col gap-3 border border-neutral-800 rounded-lg p-3">
               {fields.map((key) => {
                 const label = DATA_FIELDS.find((f) => f.key === key)?.label ?? key;
@@ -242,13 +261,24 @@ function FromTemplateMode() {
             <canvas ref={canvasRef} className="bg-white" />
           </div>
 
-          <button
-            onClick={print}
-            disabled={printing}
-            className="text-sm px-4 py-2 rounded-md bg-white text-black font-medium hover:bg-neutral-200 disabled:opacity-50 w-fit self-end"
-          >
-            {printing ? "Printing…" : "Print"}
-          </button>
+          <div className="flex items-center justify-end gap-3">
+            <label className="flex items-center gap-2 text-sm text-neutral-500">
+              Copies
+              <NumberInput
+                min={1}
+                value={copies}
+                onChange={setCopies}
+                className="w-14 bg-neutral-900 border border-neutral-800 rounded px-2 py-1 text-white"
+              />
+            </label>
+            <button
+              onClick={print}
+              disabled={printing}
+              className="text-sm px-4 py-2 rounded-md bg-white text-black font-medium hover:bg-neutral-200 disabled:opacity-50"
+            >
+              {printing ? "Printing…" : "Print"}
+            </button>
+          </div>
         </>
       )}
     </div>
@@ -260,11 +290,13 @@ function SizePicker({
   heightMm,
   onWidth,
   onHeight,
+  children,
 }: {
   widthMm: number;
   heightMm: number;
   onWidth: (mm: number) => void;
   onHeight: (mm: number) => void;
+  children?: ReactNode;
 }) {
   return (
     <div className="flex flex-wrap items-center gap-4 border border-neutral-800 rounded-lg p-3 text-sm">
@@ -299,15 +331,15 @@ function SizePicker({
       </div>
       <div className="flex items-center gap-2">
         <span className="text-neutral-500">Length</span>
-        <input
-          type="number"
+        <NumberInput
           min={5}
           value={heightMm}
-          onChange={(e) => onHeight(Number(e.target.value))}
+          onChange={onHeight}
           className="bg-neutral-900 border border-neutral-800 rounded px-2 py-1 w-20"
         />
         <span className="text-neutral-500">mm</span>
       </div>
+      {children}
     </div>
   );
 }

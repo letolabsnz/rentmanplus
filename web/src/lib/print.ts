@@ -1,5 +1,6 @@
 import { api, type RentmanRecord, type SerialNumber } from "./api";
 import { renderLabelToCanvas } from "./renderLabel";
+import { renderCustomTextCanvas } from "./customLabel";
 import {
   buildLabelContext,
   dotsPerMm,
@@ -41,9 +42,11 @@ export async function printWithManualData(
 // with arbitrary big text instead of pulling from a specific serial number.
 export async function printCustomText(
   text: string,
-  template: LabelTemplateData,
+  widthMm: number,
+  heightMm: number,
+  rotate90: boolean,
 ): Promise<{ ok: boolean; message: string }> {
-  const canvas = await renderLabelToCanvas(template, SAMPLE_CONTEXT, dotsPerMm(template.widthMm));
+  const canvas = await renderCustomTextCanvas(text, widthMm, heightMm, dotsPerMm(widthMm), rotate90, SAMPLE_CONTEXT);
   const imageDataUrl = canvas.toDataURL("image/png");
-  return api.print({ customText: text, imageDataUrl, label: labelIdForWidth(template.widthMm) });
+  return api.print({ customText: text, imageDataUrl, label: labelIdForWidth(widthMm) });
 }

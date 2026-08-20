@@ -5,6 +5,7 @@ import { renderLabelToCanvas } from "../lib/renderLabel";
 import { trimWhitespace } from "../lib/imageTrim";
 import { generateId } from "../lib/id";
 import { useToast } from "../components/ToastProvider";
+import NumberInput from "../components/NumberInput";
 import {
   applyFolderLevels,
   DATA_FIELDS,
@@ -336,11 +337,10 @@ export default function LabelEditor() {
         </div>
         <div className="flex items-center gap-2">
           <span className="text-neutral-500">Length</span>
-          <input
-            type="number"
+          <NumberInput
             min={5}
             value={heightMm}
-            onChange={(e) => setHeightMm(Number(e.target.value))}
+            onChange={setHeightMm}
             className="bg-neutral-900 border border-neutral-800 rounded px-2 py-1 w-20"
           />
           <span className="text-neutral-500">mm</span>
@@ -535,21 +535,19 @@ export default function LabelEditor() {
                 <>
                   <label className="flex flex-col gap-1">
                     <span className="text-neutral-500">Font size (mm)</span>
-                    <input
-                      type="number"
+                    <NumberInput
                       min={1}
                       value={selected.fontSize ?? 4}
-                      onChange={(e) => updateSelected({ fontSize: Number(e.target.value) })}
+                      onChange={(fontSize) => updateSelected({ fontSize })}
                       className="bg-neutral-900 border border-neutral-800 rounded px-2 py-1"
                     />
                   </label>
                   <label className="flex flex-col gap-1">
                     <span className="text-neutral-500">Padding (mm)</span>
-                    <input
-                      type="number"
+                    <NumberInput
                       min={0}
                       value={selected.padding ?? 0}
-                      onChange={(e) => updateSelected({ padding: Number(e.target.value) })}
+                      onChange={(padding) => updateSelected({ padding })}
                       className="bg-neutral-900 border border-neutral-800 rounded px-2 py-1"
                     />
                   </label>
@@ -608,6 +606,19 @@ export default function LabelEditor() {
                     />
                     <span className="text-neutral-500">Wrap text (instead of squeezing onto one line)</span>
                   </label>
+
+                  {selected.wrap && (
+                    <label className="flex items-center gap-2">
+                      <input
+                        type="checkbox"
+                        checked={selected.breakWords ?? true}
+                        onChange={(e) => updateSelected({ breakWords: e.target.checked })}
+                      />
+                      <span className="text-neutral-500">
+                        Break long words that don't fit (off condenses them onto one line instead)
+                      </span>
+                    </label>
+                  )}
                 </>
               )}
 
