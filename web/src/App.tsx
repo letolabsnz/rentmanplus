@@ -14,6 +14,7 @@ import UserDetail from "./pages/UserDetail";
 import LoginPage from "./pages/LoginPage";
 import RequireAuth from "./components/RequireAuth";
 import RequireAdmin from "./components/RequireAdmin";
+import ScanInput from "./components/ScanInput";
 import { pb, useAuthRecord } from "./lib/pocketbase";
 import { api } from "./lib/api";
 
@@ -72,6 +73,7 @@ function AppShell() {
             </NavLink>
           )}
         </nav>
+        <ScanInput />
         <span className="text-sm text-neutral-500">{record?.name || record?.email}</span>
         <button
           onClick={() => pb.authStore.clear()}

@@ -61,6 +61,7 @@ export interface Equipment extends RentmanRecord {
 export const api = {
   listAssets: () => request<RentmanListResponse<SerialNumber>>("/api/assets"),
   getAsset: (id: string) => request<SerialNumber & { _lastSubproject: RentmanRecord | null }>(`/api/assets/${id}`),
+  searchAssets: (q: string) => request<{ id: string }>(`/api/assets/search?q=${encodeURIComponent(q)}`),
 
   listEquipment: () => request<RentmanListResponse<Equipment>>("/api/equipment"),
   getEquipment: (id: string) => request<Equipment & { serialNumbers: SerialNumber[] }>(`/api/equipment/${id}`),
