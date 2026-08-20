@@ -41,6 +41,13 @@ export interface SerialNumber extends RentmanRecord {
   next_inspection: string | null;
   last_subproject: string | null;
   remark: string;
+  purchasedate: string | null;
+  book_value: number;
+  depreciation_monthly: number;
+  residual_value: number;
+  purchase_costs: number;
+  current_book_value: number;
+  sealed: boolean;
   _equipment: RentmanRecord | null;
   _location: RentmanRecord | null;
   _folder: RentmanRecord | null;
@@ -56,6 +63,28 @@ export interface Equipment extends RentmanRecord {
   current_quantity_excl_cases: number;
   location_in_warehouse: string;
   image: string | null;
+  qrcodes: string;
+  qrcodes_of_serial_numbers: string;
+  internal_remark: string;
+  external_remark: string;
+  price: number;
+  weight: number;
+  height: number;
+  width: number;
+  length: number;
+  packed_per: number;
+  critical_stock_level: number;
+  stock_management: string;
+  type: string;
+  rental_sales: string;
+  subrental_costs: number;
+  list_price: number;
+  volume: number;
+  empty_weight: number;
+  power: number;
+  current: number;
+  country_of_origin: string;
+  in_archive: boolean;
 }
 
 export const api = {
@@ -64,7 +93,8 @@ export const api = {
   searchAssets: (q: string) => request<{ id: string }>(`/api/assets/search?q=${encodeURIComponent(q)}`),
 
   listEquipment: () => request<RentmanListResponse<Equipment>>("/api/equipment"),
-  getEquipment: (id: string) => request<Equipment & { serialNumbers: SerialNumber[] }>(`/api/equipment/${id}`),
+  getEquipment: (id: string) =>
+    request<Equipment & { serialNumbers: SerialNumber[]; _folder: RentmanRecord | null }>(`/api/equipment/${id}`),
 
   listProjects: () => request<RentmanListResponse>("/api/projects"),
   getProject: (id: string) => request<RentmanRecord & { subprojects: RentmanRecord[] }>(`/api/projects/${id}`),

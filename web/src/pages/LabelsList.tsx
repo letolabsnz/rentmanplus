@@ -42,9 +42,8 @@ export default function LabelsList() {
     }
   }
 
-  function exportAll() {
-    if (!templates || templates.length === 0) return;
-    const payload: ExportedTemplate[] = templates.map(({ name, widthMm, heightMm, elements }) => ({
+  function downloadTemplates(toExport: (LabelTemplateData & { id: string })[], filename: string) {
+    const payload: ExportedTemplate[] = toExport.map(({ name, widthMm, heightMm, elements }) => ({
       name,
       widthMm,
       heightMm,
@@ -54,9 +53,19 @@ export default function LabelsList() {
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
     a.href = url;
-    a.download = `label-templates-${new Date().toISOString().slice(0, 10)}.json`;
+    a.download = filename;
     a.click();
     URL.revokeObjectURL(url);
+  }
+
+  function exportAll() {
+    if (!templates || templates.length === 0) return;
+    downloadTemplates(templates, `label-templates-${new Date().toISOString().slice(0, 10)}.json`);
+  }
+
+  function exportOne(template: LabelTemplateData & { id: string }) {
+    const slug = template.name.trim().toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/(^-|-$)/g, "") || "label";
+    downloadTemplates([template], `${slug}.json`);
   }
 
   async function importFromFile(file: File) {
@@ -141,9 +150,14 @@ export default function LabelsList() {
                 {t.widthMm}×{t.heightMm}mm · {t.elements.length} element{t.elements.length === 1 ? "" : "s"}
               </span>
             </Link>
-            <button onClick={() => remove(t.id, t.name)} className="text-neutral-600 hover:text-red-400 text-xs">
-              Delete
-            </button>
+            <div className="flex items-center gap-3">
+              <button onClick={() => exportOne(t)} className="text-neutral-600 hover:text-white text-xs">
+                Export
+              </button>
+              <button onClick={() => remove(t.id, t.name)} className="text-neutral-600 hover:text-red-400 text-xs">
+                Delete
+              </button>
+            </div>
           </div>
         ))}
         {!isLoading && templates?.length === 0 && (

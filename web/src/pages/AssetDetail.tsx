@@ -1,6 +1,7 @@
 import { Link, useParams } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import { api } from "../lib/api";
+import { buildLabelContext } from "../lib/labelSpec";
 import RecordFields from "../components/RecordFields";
 import PrintButton from "../components/PrintButton";
 
@@ -36,7 +37,7 @@ export default function AssetDetail() {
               </p>
             </div>
             <div className="flex items-center gap-3 shrink-0">
-              <PrintButton asset={asset} />
+              <PrintButton context={buildLabelContext(asset)} rentmanSerialNumberId={String(asset.id)} />
             </div>
           </div>
 

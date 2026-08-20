@@ -2,7 +2,9 @@ import { useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import { api } from "../lib/api";
+import { buildEquipmentLabelContext } from "../lib/labelSpec";
 import BatchPrintBar from "../components/BatchPrintBar";
+import PrintButton from "../components/PrintButton";
 import RefreshButton from "../components/RefreshButton";
 
 export default function EquipmentDetail() {
@@ -41,13 +43,16 @@ export default function EquipmentDetail() {
 
       {equipment && (
         <>
-          <div>
-            <h1 className="text-xl font-semibold">{equipment.displayname ?? equipment.name}</h1>
-            <p className="text-neutral-500 text-sm">
-              {equipment.code}
-              {equipment.location_in_warehouse ? ` · ${equipment.location_in_warehouse}` : ""}
-              {equipment.tags ? ` · ${equipment.tags}` : ""}
-            </p>
+          <div className="flex items-start justify-between gap-4">
+            <div>
+              <h1 className="text-xl font-semibold">{equipment.displayname ?? equipment.name}</h1>
+              <p className="text-neutral-500 text-sm">
+                {equipment.code}
+                {equipment.location_in_warehouse ? ` · ${equipment.location_in_warehouse}` : ""}
+                {equipment.tags ? ` · ${equipment.tags}` : ""}
+              </p>
+            </div>
+            <PrintButton context={buildEquipmentLabelContext(equipment)} />
           </div>
 
           {selectedAssets.length > 0 && (

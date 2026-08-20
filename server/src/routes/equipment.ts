@@ -45,9 +45,10 @@ export async function equipmentRoutes(app: FastifyInstance) {
   // cache window no matter how many different items you look at.
   app.get("/api/equipment/:id", async (req, reply) => {
     const { id } = req.params as { id: string };
-    const [allEquipment, allSerials, quantities] = await Promise.all([
+    const [allEquipment, allSerials, allFolders, quantities] = await Promise.all([
       rentman.listAllEquipment(),
       rentman.listAllSerialNumbers(),
+      rentman.listAllFolders(),
       quantityByEquipmentId(),
     ]);
     const equipment = allEquipment.find((e) => String(e.id) === id);
@@ -55,10 +56,12 @@ export async function equipmentRoutes(app: FastifyInstance) {
       return reply.code(404).send({ error: "Equipment not found" });
     }
     const serials = allSerials.filter((s) => idFromRef(s.equipment) === id);
+    const folder = allFolders.find((f) => String(f.id) === idFromRef(equipment.folder));
     return {
       ...equipment,
       current_quantity: equipment.current_quantity ?? quantities.get(id) ?? 0,
       serialNumbers: await enrichSerialNumbers(serials),
+      _folder: folder ?? null,
     };
   });
 }

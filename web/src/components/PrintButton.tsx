@@ -2,10 +2,17 @@ import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Link } from "react-router-dom";
 import { api } from "../lib/api";
-import { printAsset, type PrintableAsset } from "../lib/print";
+import { printRecord } from "../lib/print";
+import type { LabelDataContext } from "../lib/labelSpec";
 import { useToast } from "./ToastProvider";
 
-export default function PrintButton({ asset }: { asset: PrintableAsset }) {
+export default function PrintButton({
+  context,
+  rentmanSerialNumberId,
+}: {
+  context: LabelDataContext;
+  rentmanSerialNumberId?: string;
+}) {
   const [open, setOpen] = useState(false);
   const [printing, setPrinting] = useState(false);
   const { showToast } = useToast();
@@ -17,7 +24,7 @@ export default function PrintButton({ asset }: { asset: PrintableAsset }) {
     if (!template) return;
     setPrinting(true);
     try {
-      const result = await printAsset(asset, template);
+      const result = await printRecord(context, template, rentmanSerialNumberId);
       if (result.ok) {
         showToast("success", "Printed");
       } else {
