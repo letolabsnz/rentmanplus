@@ -9,9 +9,11 @@ import { useToast } from "./ToastProvider";
 export default function PrintButton({
   context,
   rentmanSerialNumberId,
+  label = "Print label",
 }: {
   context: LabelDataContext;
   rentmanSerialNumberId?: string;
+  label?: string;
 }) {
   const [open, setOpen] = useState(false);
   const [printing, setPrinting] = useState(false);
@@ -45,7 +47,7 @@ export default function PrintButton({
         disabled={printing}
         className="text-sm px-3 py-1.5 rounded-md border border-neutral-700 hover:bg-neutral-900 disabled:opacity-50"
       >
-        {printing ? "Printing…" : "Print label"}
+        {printing ? "Printing…" : label}
       </button>
 
       {open && (

@@ -52,7 +52,7 @@ export default function EquipmentDetail() {
                 {equipment.tags ? ` · ${equipment.tags}` : ""}
               </p>
             </div>
-            <PrintButton context={buildEquipmentLabelContext(equipment)} />
+            <PrintButton context={buildEquipmentLabelContext(equipment)} label="Print bulk label" />
           </div>
 
           {selectedAssets.length > 0 && (
